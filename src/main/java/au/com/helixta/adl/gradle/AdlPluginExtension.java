@@ -8,6 +8,7 @@ import org.gradle.api.file.FileTree;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ExtensionAware;
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
@@ -165,10 +166,23 @@ public abstract class AdlPluginExtension implements ExtensionAware
 
     public abstract static class JavaGeneration extends Generation
     {
+        private String javaPackage;
+
         @Override
         protected String generationType()
         {
             return "java";
+        }
+
+        @Input
+        public String getJavaPackage()
+        {
+            return javaPackage;
+        }
+
+        public void setJavaPackage(String javaPackage)
+        {
+            this.javaPackage = javaPackage;
         }
     }
 }
