@@ -10,6 +10,7 @@ import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Nested;
+import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
@@ -20,6 +21,7 @@ import org.gradle.internal.Factory;
 import javax.inject.Inject;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public abstract class AdlPluginExtension implements ExtensionAware
@@ -69,6 +71,8 @@ public abstract class AdlPluginExtension implements ExtensionAware
                 getObjectFactory().fileCollection();
 
         private final PatternSet patternSet = getPatternSetFactory().create().include("**/*.adl");
+
+        private final List<File> searchDirectories = new ArrayList<>();
 
         @Inject
         protected abstract ObjectFactory getObjectFactory();
@@ -126,6 +130,36 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public DirectoryProperty getOutputDirectory()
         {
             return outputDirectory;
+        }
+
+        @InputFiles
+        @Optional
+        public List<File> getSearchDirectories()
+        {
+            return searchDirectories;
+        }
+
+        public Generation searchDirectory(File... dirs)
+        {
+            searchDirectories.addAll(Arrays.asList(dirs));
+            return this;
+        }
+
+        public Generation searchDirectory(FileCollection... dirs)
+        {
+            for (FileCollection dir : dirs)
+            {
+                //For collections, pull out top-level dir and use that
+                dir.getAsFileTree().visit(d ->
+                {
+                    if (d.isDirectory())
+                    {
+                        searchDirectories.add(d.getFile());
+                        d.stopVisiting();
+                    }
+                });
+            }
+            return this;
         }
     }
 

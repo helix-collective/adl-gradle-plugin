@@ -37,6 +37,7 @@ public class AdlGenerateJavaTask extends DefaultTask
         {
             System.out.println("Generate java: " + java.getOutputDirectory().get());
             System.out.println("   Files: " + java.getSourcepath().getFiles());
+            System.out.println("   Search dirs: " + java.getSearchDirectories());
         }
     }
 }
