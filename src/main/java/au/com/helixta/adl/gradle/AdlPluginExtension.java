@@ -181,6 +181,7 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private String javaPackage;
         private String adlRuntimePackage;
         private boolean generateAdlRuntime;
+        private boolean generateTransitive;
 
         @Override
         protected String generationType()
@@ -220,6 +221,17 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setGenerateAdlRuntime(boolean generateAdlRuntime)
         {
             this.generateAdlRuntime = generateAdlRuntime;
+        }
+
+        @Input
+        public boolean isGenerateTransitive()
+        {
+            return generateTransitive;
+        }
+
+        public void setGenerateTransitive(boolean generateTransitive)
+        {
+            this.generateTransitive = generateTransitive;
         }
     }
 }

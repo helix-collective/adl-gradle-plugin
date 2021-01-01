@@ -204,6 +204,9 @@ public class DockerAdlGenerator implements AdlGenerator
         if (generation.getAdlRuntimePackage() != null && !generation.getAdlRuntimePackage().isEmpty())
             command.add("--rtpackage=" + generation.getAdlRuntimePackage());
 
+        if (generation.isGenerateTransitive())
+            command.add("--generate-transitive");
+
         command.addAll(sources.getFilePaths());
 
         return command;
