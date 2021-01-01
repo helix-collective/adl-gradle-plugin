@@ -2,25 +2,34 @@ package au.com.helixta.adl.gradle;
 
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
+import au.com.helixta.adl.gradle.generator.ColoredAdlToolLogger;
 import au.com.helixta.adl.gradle.generator.DockerAdlGenerator;
 import org.gradle.api.Action;
 import org.gradle.api.DefaultTask;
+import org.gradle.api.logging.LogLevel;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.TaskAction;
+import org.gradle.internal.logging.text.StyledTextOutput;
+import org.gradle.internal.logging.text.StyledTextOutputFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
 
 public class AdlGenerateJavaTask extends DefaultTask
 {
-    private final AdlPluginExtension.Generations generations;
+    private final AdlPluginExtension.Generations generations = getObjectFactory().newInstance(AdlPluginExtension.Generations.class);
 
     @Inject
-    public AdlGenerateJavaTask(ObjectFactory objectFactory)
+    protected ObjectFactory getObjectFactory()
     {
-        //this.generations =  getExtensions().create("generations", AdlPluginExtension.Generations.class, objectFactory);
-        this.generations = objectFactory.newInstance(AdlPluginExtension.Generations.class);
+        throw new UnsupportedOperationException();
+    }
+
+    @Inject
+    protected StyledTextOutputFactory getStyledTextOutputFactory()
+    {
+        throw new UnsupportedOperationException();
     }
 
     @Nested
@@ -42,9 +51,9 @@ public class AdlGenerateJavaTask extends DefaultTask
         {
             for (AdlPluginExtension.JavaGeneration java : getGenerations().getJava())
             {
-                System.out.println("Generate java: " + java.getOutputDirectory().get());
-                System.out.println("   Files: " + java.getSourcepath().getFiles());
-                System.out.println("   Search dirs: " + java.getSearchDirectories());
+                getLogger().warn("Generate java: " + java.getOutputDirectory().get());
+                getLogger().warn("   Files: " + java.getSourcepath().getFiles());
+                getLogger().warn("   Search dirs: " + java.getSearchDirectories());
             }
             generator.generate(getGenerations().getJava());
         }
@@ -52,6 +61,9 @@ public class AdlGenerateJavaTask extends DefaultTask
 
     private AdlGenerator createGenerator()
     {
-        return DockerAdlGenerator.fromConfiguration();
+        //TODO configuration option to fallback to plain output
+        StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateJavaTask.class, LogLevel.INFO);
+        StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateJavaTask.class, LogLevel.ERROR);
+        return DockerAdlGenerator.fromConfiguration(new ColoredAdlToolLogger(out, err));
     }
 }
