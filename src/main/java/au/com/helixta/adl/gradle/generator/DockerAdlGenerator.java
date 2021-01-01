@@ -192,6 +192,9 @@ public class DockerAdlGenerator implements AdlGenerator
         if (generation.getJavaPackage() != null && !generation.getJavaPackage().trim().isEmpty())
             command.add("--package=" + generation.getJavaPackage());
 
+        if (generation.isVerbose())
+            command.add("--verbose");
+
         command.addAll(sources.getFilePaths());
 
         return command;

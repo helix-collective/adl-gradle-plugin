@@ -75,6 +75,8 @@ public abstract class AdlPluginExtension implements ExtensionAware
 
         private final List<File> searchDirectories = new ArrayList<>();
 
+        private boolean verbose;
+
         @Inject
         protected abstract ObjectFactory getObjectFactory();
 
@@ -161,6 +163,16 @@ public abstract class AdlPluginExtension implements ExtensionAware
                 });
             }
             return this;
+        }
+
+        public boolean isVerbose()
+        {
+            return verbose;
+        }
+
+        public void setVerbose(boolean verbose)
+        {
+            this.verbose = verbose;
         }
     }
 
