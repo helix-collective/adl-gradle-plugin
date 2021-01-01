@@ -21,11 +21,13 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.gradle.api.file.ConfigurableFileTree;
 import org.gradle.api.file.Directory;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.file.RelativePath;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
+import org.gradle.api.model.ObjectFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -49,16 +51,17 @@ public class DockerAdlGenerator implements AdlGenerator
     private static final String TOOL_ADLC = "adlc";
 
     private final AdlToolLogger adlLog;
-
     private final DockerClient docker;
+    private final ObjectFactory objectFactory;
 
-    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog)
+    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, ObjectFactory objectFactory)
     {
         this.docker = Objects.requireNonNull(docker);
         this.adlLog = Objects.requireNonNull(adlLog);
+        this.objectFactory = Objects.requireNonNull(objectFactory);
     }
 
-    public static DockerAdlGenerator fromConfiguration(AdlToolLogger adlLog) //TODO input config
+    public static DockerAdlGenerator fromConfiguration(AdlToolLogger adlLog, ObjectFactory objectFactory) //TODO input config
     {
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
@@ -67,7 +70,7 @@ public class DockerAdlGenerator implements AdlGenerator
                                             .build();
 
          DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
-         return new DockerAdlGenerator(docker, adlLog);
+         return new DockerAdlGenerator(docker, adlLog, objectFactory);
     }
 
     private void pullDockerImage(String imageName)
@@ -164,14 +167,30 @@ public class DockerAdlGenerator implements AdlGenerator
               .exec();
     }
 
-    private List<String> adlcCommand(AdlPluginExtension.Generation generation, SourceTarArchive sources)
+    private List<String> adlcCommand(AdlPluginExtension.Generation generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
+    throws AdlGenerationException
+    {
+        if (generation instanceof AdlPluginExtension.JavaGeneration)
+            return adlcJavaCommand((AdlPluginExtension.JavaGeneration)generation, sources, searchDirs);
+        else
+            throw new AdlGenerationException("Unknown generation type: " + generation.getClass().getName());
+    }
+
+    private List<String> adlcJavaCommand(AdlPluginExtension.JavaGeneration generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
     {
         List<String> command = new ArrayList<>();
         command.add("/opt/bin/adlc");
         command.add("java");
 
-        //TODO more args
         command.add("--outputdir=" + getOutputPathInContainer());
+
+        for (SourceTarArchive searchDir : searchDirs)
+        {
+            command.add("--searchdir=" + searchDir.getBaseDirectory());
+        }
+
+        if (generation.getJavaPackage() != null && !generation.getJavaPackage().trim().isEmpty())
+            command.add("--package=" + generation.getJavaPackage());
 
         command.addAll(sources.getFilePaths());
 
@@ -188,14 +207,31 @@ public class DockerAdlGenerator implements AdlGenerator
         return "/data/generated/";
     }
 
+    protected String getSearchDirectoryPathInContainer()
+    {
+        return "/data/searchdirs/";
+    }
+
     private void runAdlc(AdlPluginExtension.Generation generation)
     throws AdlGenerationException
     {
         //Generate archive for source files
         SourceTarArchive sourceTar = createTarFromFileTree(generation.getSourcepath(), getSourcePathInContainer());
 
+        //and searchdirs
+        List<SourceTarArchive> searchDirTars = new ArrayList<>();
+        int searchDirIndex = 0;
+        for (File searchDirectory : generation.getSearchDirectories())
+        {
+            String searchDirContainerPath = getSearchDirectoryPathInContainer() + searchDirIndex + "/";
+            ConfigurableFileTree searchDirTree = objectFactory.fileTree().from(searchDirectory);
+            SourceTarArchive searchDirTar = createTarFromFileTree(searchDirTree, searchDirContainerPath);
+            searchDirTars.add(searchDirTar);
+            searchDirIndex++;
+        }
+
         //Put together the ADL command
-        List<String> adlcCommand = adlcCommand(generation, sourceTar);
+        List<String> adlcCommand = adlcCommand(generation, sourceTar, searchDirTars);
         log.info("adlc command " + adlcCommand);
 
         //Create Docker container that can execute ADL compiler
@@ -212,6 +248,10 @@ public class DockerAdlGenerator implements AdlGenerator
         {
             //Copy source files to the container
             copySourceFilesToDockerContainer(sourceTar, containerId);
+            for (SourceTarArchive searchDirTar : searchDirTars)
+            {
+                copySourceFilesToDockerContainer(searchDirTar, containerId);
+            }
 
             //Reading console output from the process
             //Don't log directly from the callback because it's on another thread and Gradle has a threadlocal to group task-specific logs
@@ -244,6 +284,7 @@ public class DockerAdlGenerator implements AdlGenerator
             docker.startContainerCmd(containerId).exec();
 
             Integer result = docker.waitContainerCmd(containerId).start().awaitStatusCode(); //TODO timeout
+            boolean hasErrors = (result == null || result != 0);
 
             //Stream console records to logger now
             for (ConsoleRecord adlConsoleRecord : adlConsoleRecords)
@@ -251,7 +292,11 @@ public class DockerAdlGenerator implements AdlGenerator
                 switch (adlConsoleRecord.getType())
                 {
                     case STDOUT:
-                        adlLog.info(TOOL_ADLC, adlConsoleRecord.getMessage());
+                        //adlc puts error messages to stdout, so in case of error send them all to error
+                        if (hasErrors)
+                            adlLog.error(TOOL_ADLC, adlConsoleRecord.getMessage());
+                        else
+                            adlLog.info(TOOL_ADLC, adlConsoleRecord.getMessage());
                         break;
                     case STDERR:
                         adlLog.error(TOOL_ADLC, adlConsoleRecord.getMessage());
@@ -260,7 +305,7 @@ public class DockerAdlGenerator implements AdlGenerator
                 }
             }
 
-            if (result == null || result != 0)
+            if (hasErrors)
                 throw new AdlGenerationException("adlc error (" + result + ")");
 
             //Copy generated files back out of container
@@ -299,9 +344,6 @@ public class DockerAdlGenerator implements AdlGenerator
                 {
                     //Docker TAR archives have the last segment of the base directory in the TAR archive, so strip that out
                     String relativeName = relativizeTarPath(getOutputPathInContainer(), entry.getName());
-
-                    //Also remove /adl prefix if it exists - the ADL tool seems to add this one
-                    relativeName = relativizeTarPath("/adl/", relativeName);
 
                     //Copy the file data to the host filesystem
                     File adlOutputFile = outDir.file(relativeName).getAsFile();

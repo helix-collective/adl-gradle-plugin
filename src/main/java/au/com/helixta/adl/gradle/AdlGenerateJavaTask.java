@@ -64,6 +64,6 @@ public class AdlGenerateJavaTask extends DefaultTask
         //TODO configuration option to fallback to plain output
         StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateJavaTask.class, LogLevel.INFO);
         StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateJavaTask.class, LogLevel.ERROR);
-        return DockerAdlGenerator.fromConfiguration(new ColoredAdlToolLogger(out, err));
+        return DockerAdlGenerator.fromConfiguration(new ColoredAdlToolLogger(out, err), getObjectFactory());
     }
 }
