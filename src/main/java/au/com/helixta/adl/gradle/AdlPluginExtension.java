@@ -179,6 +179,8 @@ public abstract class AdlPluginExtension implements ExtensionAware
     public abstract static class JavaGeneration extends Generation
     {
         private String javaPackage;
+        private String adlRuntimePackage;
+        private boolean generateAdlRuntime;
 
         @Override
         protected String generationType()
@@ -195,6 +197,29 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setJavaPackage(String javaPackage)
         {
             this.javaPackage = javaPackage;
+        }
+
+        @Input
+        @Optional
+        public String getAdlRuntimePackage()
+        {
+            return adlRuntimePackage;
+        }
+
+        public void setAdlRuntimePackage(String adlRuntimePackage)
+        {
+            this.adlRuntimePackage = adlRuntimePackage;
+        }
+
+        @Input
+        public boolean isGenerateAdlRuntime()
+        {
+            return generateAdlRuntime;
+        }
+
+        public void setGenerateAdlRuntime(boolean generateAdlRuntime)
+        {
+            this.generateAdlRuntime = generateAdlRuntime;
         }
     }
 }

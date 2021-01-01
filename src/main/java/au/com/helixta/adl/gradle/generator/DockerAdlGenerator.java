@@ -29,20 +29,24 @@ import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
+import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class DockerAdlGenerator implements AdlGenerator
 {
@@ -195,6 +199,11 @@ public class DockerAdlGenerator implements AdlGenerator
         if (generation.isVerbose())
             command.add("--verbose");
 
+        if (generation.isGenerateAdlRuntime())
+            command.add("--include-rt");
+        if (generation.getAdlRuntimePackage() != null && !generation.getAdlRuntimePackage().isEmpty())
+            command.add("--rtpackage=" + generation.getAdlRuntimePackage());
+
         command.addAll(sources.getFilePaths());
 
         return command;
@@ -258,7 +267,7 @@ public class DockerAdlGenerator implements AdlGenerator
 
             //Reading console output from the process
             //Don't log directly from the callback because it's on another thread and Gradle has a threadlocal to group task-specific logs
-            List<ConsoleRecord> adlConsoleRecords = Collections.synchronizedList(new ArrayList<>());
+            ConsoleRecorder adlConsoleRecords = new ConsoleRecorder();
             ResultCallbackTemplate<ResultCallback<Frame>, Frame> outCallback = docker.attachContainerCmd(containerId)
                                                                                      .withStdOut(true).withStdErr(true)
                                                                                      .withFollowStream(true)
@@ -267,9 +276,7 @@ public class DockerAdlGenerator implements AdlGenerator
                                                                                          @Override
                                                                                          public void onNext(Frame object)
                                                                                          {
-                                                                                             adlConsoleRecords.add(new ConsoleRecord(object.getStreamType(),
-                                                                                                                                     new String(object.getPayload(),
-                                                                                                                                                StandardCharsets.UTF_8)));
+                                                                                             adlConsoleRecords.add(object.getStreamType(), object.getPayload());
                                                                                          }
                                                                                      });
             try
@@ -290,21 +297,24 @@ public class DockerAdlGenerator implements AdlGenerator
             boolean hasErrors = (result == null || result != 0);
 
             //Stream console records to logger now
-            for (ConsoleRecord adlConsoleRecord : adlConsoleRecords)
+            for (ConsoleRecord adlConsoleRecord : adlConsoleRecords.getRecords())
             {
-                switch (adlConsoleRecord.getType())
+                for (String adlConsoleRecordLine : adlConsoleRecord.getMessageLines())
                 {
-                    case STDOUT:
-                        //adlc puts error messages to stdout, so in case of error send them all to error
-                        if (hasErrors)
-                            adlLog.error(TOOL_ADLC, adlConsoleRecord.getMessage());
-                        else
-                            adlLog.info(TOOL_ADLC, adlConsoleRecord.getMessage());
-                        break;
-                    case STDERR:
-                        adlLog.error(TOOL_ADLC, adlConsoleRecord.getMessage());
-                        break;
-                    //Ignore other types, stdout/stderr is only two we are interested in
+                    switch (adlConsoleRecord.getType())
+                    {
+                        case STDOUT:
+                            //adlc puts error messages to stdout, so in case of error send them all to error
+                            if (hasErrors)
+                                adlLog.error(TOOL_ADLC, adlConsoleRecordLine);
+                            else
+                                adlLog.info(TOOL_ADLC, adlConsoleRecordLine);
+                            break;
+                        case STDERR:
+                            adlLog.error(TOOL_ADLC, adlConsoleRecordLine);
+                            break;
+                        //Ignore other types, stdout/stderr is only two we are interested in
+                    }
                 }
             }
 
@@ -417,15 +427,43 @@ public class DockerAdlGenerator implements AdlGenerator
         }
     }
 
+    private static class ConsoleRecorder
+    {
+        private final List<ConsoleRecord> records = new ArrayList<>();
+
+        public synchronized void add(StreamType type, byte[] messageBytes)
+        {
+            //Append to existing last record if the same type
+            if (!records.isEmpty())
+            {
+                ConsoleRecord lastRecord = records.get(records.size() - 1);
+                if (lastRecord.getType() == type)
+                {
+                    lastRecord.append(messageBytes);
+                    return;
+                }
+            }
+
+            //Otherwise new record
+            records.add(new ConsoleRecord(type, messageBytes));
+        }
+
+        public synchronized List<? extends ConsoleRecord> getRecords()
+        {
+            return new ArrayList<>(records);
+        }
+    }
+
     private static class ConsoleRecord
     {
         private final StreamType type;
-        private final String message;
+        private final ByteArrayOutputStream messageBuffer = new ByteArrayOutputStream();
 
-        public ConsoleRecord(StreamType type, String message)
+        //Keeping everything as bytes for as long as possible in case a multi-byte character is split across boundaries
+        public ConsoleRecord(StreamType type, byte[] messageBytes)
         {
             this.type = type;
-            this.message = message;
+            append(messageBytes);
         }
 
         public StreamType getType()
@@ -435,7 +473,41 @@ public class DockerAdlGenerator implements AdlGenerator
 
         public String getMessage()
         {
-            return message;
+            try
+            {
+                return messageBuffer.toString(StandardCharsets.UTF_8.name());
+            }
+            catch (UnsupportedEncodingException e)
+            {
+                //UTF-8 should always be supported
+                throw new IOError(e);
+            }
+        }
+
+        public List<String> getMessageLines()
+        {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(messageBuffer.toByteArray()))))
+            {
+                return br.lines().collect(Collectors.toList());
+            }
+            catch (IOException e)
+            {
+                //Shouldn't happen for in-memory - and UTF-8 encoding errors will decode to bad chars not throw exception
+                throw new IOError(e);
+            }
+        }
+
+        public void append(byte[] messageBytes)
+        {
+            try
+            {
+                messageBuffer.write(messageBytes);
+            }
+            catch (IOException e)
+            {
+                //In-memory, should not happen
+                throw new IOError(e);
+            }
         }
     }
 
