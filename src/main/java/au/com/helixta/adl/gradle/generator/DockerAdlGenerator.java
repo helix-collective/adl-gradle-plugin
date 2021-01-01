@@ -206,6 +206,8 @@ public class DockerAdlGenerator implements AdlGenerator
 
         if (generation.isGenerateTransitive())
             command.add("--generate-transitive");
+        if (generation.getSuppressWarningsAnnotation() != null && !generation.getSuppressWarningsAnnotation().isEmpty())
+            command.add("--suppress-warnings-annotation=" + generation.getSuppressWarningsAnnotation());
 
         command.addAll(sources.getFilePaths());
 

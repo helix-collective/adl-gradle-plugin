@@ -182,6 +182,7 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private String adlRuntimePackage;
         private boolean generateAdlRuntime;
         private boolean generateTransitive;
+        private String suppressWarningsAnnotation;
 
         @Override
         protected String generationType()
@@ -232,6 +233,18 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setGenerateTransitive(boolean generateTransitive)
         {
             this.generateTransitive = generateTransitive;
+        }
+
+        @Input
+        @Optional
+        public String getSuppressWarningsAnnotation()
+        {
+            return suppressWarningsAnnotation;
+        }
+
+        public void setSuppressWarningsAnnotation(String suppressWarningsAnnotation)
+        {
+            this.suppressWarningsAnnotation = suppressWarningsAnnotation;
         }
     }
 }
