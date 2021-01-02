@@ -201,6 +201,7 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private boolean generateAdlRuntime;
         private boolean generateTransitive;
         private String suppressWarningsAnnotation;
+        private String headerComment;
 
         private final RegularFileProperty manifest = getObjectFactory().fileProperty();
 
@@ -277,6 +278,18 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setManifest(File manifestFile)
         {
             manifest.fileValue(manifestFile);
+        }
+
+        @Input
+        @Optional
+        public String getHeaderComment()
+        {
+            return headerComment;
+        }
+
+        public void setHeaderComment(String headerComment)
+        {
+            this.headerComment = headerComment;
         }
     }
 }
