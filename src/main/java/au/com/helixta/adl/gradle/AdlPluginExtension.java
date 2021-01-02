@@ -6,6 +6,7 @@ import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.file.ProjectLayout;
+import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.tasks.Input;
@@ -13,6 +14,7 @@ import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.SkipWhenEmpty;
@@ -184,6 +186,8 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private boolean generateTransitive;
         private String suppressWarningsAnnotation;
 
+        private final RegularFileProperty manifest = getObjectFactory().fileProperty();
+
         @Override
         protected String generationType()
         {
@@ -245,6 +249,18 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setSuppressWarningsAnnotation(String suppressWarningsAnnotation)
         {
             this.suppressWarningsAnnotation = suppressWarningsAnnotation;
+        }
+
+        @OutputFile
+        @Optional
+        public RegularFileProperty getManifest()
+        {
+            return manifest;
+        }
+
+        public void setManifest(File manifestFile)
+        {
+            manifest.fileValue(manifestFile);
         }
     }
 }

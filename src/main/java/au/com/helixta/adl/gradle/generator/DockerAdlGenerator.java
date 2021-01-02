@@ -34,6 +34,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
@@ -209,6 +210,9 @@ public class DockerAdlGenerator implements AdlGenerator
         if (generation.getSuppressWarningsAnnotation() != null && !generation.getSuppressWarningsAnnotation().isEmpty())
             command.add("--suppress-warnings-annotation=" + generation.getSuppressWarningsAnnotation());
 
+        if (generation.getManifest().isPresent())
+            command.add("--manifest=" + getManifestOutputPathInContainer() + generation.getManifest().get().getAsFile().getName());
+
         command.addAll(sources.getFilePaths());
 
         return command;
@@ -222,6 +226,11 @@ public class DockerAdlGenerator implements AdlGenerator
     protected String getOutputPathInContainer()
     {
         return "/data/generated/";
+    }
+
+    protected String getManifestOutputPathInContainer()
+    {
+        return "/data/";
     }
 
     protected String getSearchDirectoryPathInContainer()
@@ -329,6 +338,22 @@ public class DockerAdlGenerator implements AdlGenerator
             //Copy generated files back out of container
             int generatedAdlFileCount = copyOutputFilesFromDockerContainer(generation, containerId);
             log.info(generatedAdlFileCount + " ADL file(s) generated.");
+
+            //and manifest file if they were required
+            //TODO make this more generic
+            if (generation instanceof AdlPluginExtension.JavaGeneration)
+            {
+                AdlPluginExtension.JavaGeneration javaGeneration = (AdlPluginExtension.JavaGeneration)generation;
+                if (javaGeneration.getManifest().isPresent())
+                {
+                    String manifestContainerPath = getManifestOutputPathInContainer();
+                    File manifestFileOnHost = javaGeneration.getManifest().get().getAsFile();
+                    Directory manifestDirOnHost = objectFactory.directoryProperty().fileValue(manifestFileOnHost.getParentFile()).get();
+                    int generatedManifestFileCount = copyFilesFromDockerContainer(manifestContainerPath, manifestDirOnHost, containerId,
+                                                                                  (dir, name) -> new File(dir, name).equals(manifestFileOnHost));
+                    log.info(generatedManifestFileCount + " manifest file(s) generated.");
+                }
+            }
         }
         finally
         {
@@ -345,13 +370,18 @@ public class DockerAdlGenerator implements AdlGenerator
         }
     }
 
-    private int copyOutputFilesFromDockerContainer(AdlPluginExtension.Generation generation, String containerId)
+    private int copyFilesFromDockerContainer(String containerDirectory, Directory hostOutputDirectory, String containerId)
+    throws AdlGenerationException
+    {
+        return copyFilesFromDockerContainer(containerDirectory, hostOutputDirectory, containerId, (dir, name) -> true);
+    }
+
+    private int copyFilesFromDockerContainer(String containerDirectory, Directory hostOutputDirectory, String containerId, FilenameFilter filter)
     throws AdlGenerationException
     {
         int generatedAdlFileCount = 0;
-        Directory outDir = generation.getOutputDirectory().get();
 
-        try (InputStream is = docker.copyArchiveFromContainerCmd(containerId, getOutputPathInContainer()).exec();
+        try (InputStream is = docker.copyArchiveFromContainerCmd(containerId, containerDirectory).exec();
              TarArchiveInputStream tis = new TarArchiveInputStream(is))
         {
             TarArchiveEntry entry;
@@ -361,14 +391,16 @@ public class DockerAdlGenerator implements AdlGenerator
                 if (entry != null && !entry.isDirectory())
                 {
                     //Docker TAR archives have the last segment of the base directory in the TAR archive, so strip that out
-                    String relativeName = relativizeTarPath(getOutputPathInContainer(), entry.getName());
+                    String relativeName = relativizeTarPath(containerDirectory, entry.getName());
 
                     //Copy the file data to the host filesystem
-                    File adlOutputFile = outDir.file(relativeName).getAsFile();
-                    FileUtils.forceMkdirParent(adlOutputFile);
-                    Files.copy(tis, adlOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-
-                    generatedAdlFileCount++;
+                    File adlOutputFile = hostOutputDirectory.file(relativeName).getAsFile();
+                    if (filter.accept(adlOutputFile.getParentFile(), adlOutputFile.getName()))
+                    {
+                        FileUtils.forceMkdirParent(adlOutputFile);
+                        Files.copy(tis, adlOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        generatedAdlFileCount++;
+                    }
                 }
             }
             while (entry != null);
@@ -379,6 +411,12 @@ public class DockerAdlGenerator implements AdlGenerator
         }
 
         return generatedAdlFileCount;
+    }
+
+    private int copyOutputFilesFromDockerContainer(AdlPluginExtension.Generation generation, String containerId)
+    throws AdlGenerationException
+    {
+        return copyFilesFromDockerContainer(getOutputPathInContainer(), generation.getOutputDirectory().get(), containerId);
     }
 
     private static String relativizeTarPath(String expectedBase, String entryName)
