@@ -19,6 +19,7 @@ import java.io.IOException;
 public class AdlGenerateJavaTask extends DefaultTask
 {
     private final AdlPluginExtension.Generations generations = getObjectFactory().newInstance(AdlPluginExtension.Generations.class);
+    private final AdlPluginExtension.DockerConfiguration docker = getObjectFactory().newInstance(AdlPluginExtension.DockerConfiguration.class);
 
     @Inject
     protected ObjectFactory getObjectFactory()
@@ -38,9 +39,20 @@ public class AdlGenerateJavaTask extends DefaultTask
         return generations;
     }
 
+    @Nested
+    public AdlPluginExtension.DockerConfiguration getDocker()
+    {
+        return docker;
+    }
+
     public void generations(Action<? super AdlPluginExtension.Generations> configuration)
     {
         configuration.execute(generations);
+    }
+
+    public void docker(Action<? super AdlPluginExtension.DockerConfiguration> configuration)
+    {
+        configuration.execute(docker);
     }
 
     @TaskAction
@@ -64,6 +76,6 @@ public class AdlGenerateJavaTask extends DefaultTask
         //TODO configuration option to fallback to plain output
         StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateJavaTask.class, LogLevel.INFO);
         StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateJavaTask.class, LogLevel.ERROR);
-        return DockerAdlGenerator.fromConfiguration(new ColoredAdlToolLogger(out, err), getObjectFactory());
+        return DockerAdlGenerator.fromConfiguration(getDocker(), new ColoredAdlToolLogger(out, err), getObjectFactory());
     }
 }

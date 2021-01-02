@@ -66,9 +66,13 @@ public class DockerAdlGenerator implements AdlGenerator
         this.objectFactory = Objects.requireNonNull(objectFactory);
     }
 
-    public static DockerAdlGenerator fromConfiguration(AdlToolLogger adlLog, ObjectFactory objectFactory) //TODO input config
+    public static DockerAdlGenerator fromConfiguration(AdlPluginExtension.DockerConfiguration dockerConfiguration,
+                                                       AdlToolLogger adlLog,
+                                                       ObjectFactory objectFactory) //TODO input config
     {
-        DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
+        System.out.println("Docker configuration: " + dockerConfiguration.getHost());
+
+        DockerClientConfig config = dockerClientConfig(dockerConfiguration);
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
                                             .dockerHost(config.getDockerHost())
                                             .sslConfig(config.getSSLConfig())
@@ -76,6 +80,18 @@ public class DockerAdlGenerator implements AdlGenerator
 
          DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
          return new DockerAdlGenerator(docker, adlLog, objectFactory);
+    }
+
+    private static DockerClientConfig dockerClientConfig(AdlPluginExtension.DockerConfiguration config)
+    {
+        //By default, everything configured from environment, such as environment variables
+        DefaultDockerClientConfig.Builder c = DefaultDockerClientConfig.createDefaultConfigBuilder();
+
+        //Augment with anything overridden from the docker configuration
+        if (config.getHost() != null)
+            c.withDockerHost(config.getHost().toString());
+
+        return c.build();
     }
 
     private void pullDockerImage(String imageName)

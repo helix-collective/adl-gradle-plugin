@@ -12,6 +12,7 @@ import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.tasks.Console;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
@@ -24,6 +25,7 @@ import org.gradle.internal.Factory;
 
 import javax.inject.Inject;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.util.List;
 public abstract class AdlPluginExtension implements ExtensionAware
 {
     private final Generations generations = getExtensions().create("generations", Generations.class);
+    private final DockerConfiguration docker = getExtensions().create("docker", DockerConfiguration.class);
 
     @Nested
     public Generations getGenerations()
@@ -38,9 +41,20 @@ public abstract class AdlPluginExtension implements ExtensionAware
         return generations;
     }
 
+    @Nested
+    public DockerConfiguration getDocker()
+    {
+        return docker;
+    }
+
     public void generations(Action<? super Generations> configuration)
     {
         configuration.execute(generations);
+    }
+
+    public void docker(Action<? super DockerConfiguration> configuration)
+    {
+        configuration.execute(docker);
     }
 
     public abstract static class Generations implements ExtensionAware
@@ -290,6 +304,23 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setHeaderComment(String headerComment)
         {
             this.headerComment = headerComment;
+        }
+    }
+
+    public abstract static class DockerConfiguration
+    {
+        private URI host;
+
+        public URI getHost()
+        {
+            return host;
+        }
+
+        @Optional
+        @Internal
+        public void setHost(URI host)
+        {
+            this.host = host;
         }
     }
 }
