@@ -213,6 +213,8 @@ public class DockerAdlGenerator implements AdlGenerator
         if (generation.getManifest().isPresent())
             command.add("--manifest=" + getManifestOutputPathInContainer() + generation.getManifest().get().getAsFile().getName());
 
+        command.addAll(generation.getCompilerArgs());
+
         command.addAll(sources.getFilePaths());
 
         return command;

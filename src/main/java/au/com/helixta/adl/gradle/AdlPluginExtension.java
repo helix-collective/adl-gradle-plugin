@@ -9,6 +9,7 @@ import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ExtensionAware;
+import org.gradle.api.tasks.Console;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Nested;
@@ -78,6 +79,8 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private final List<File> searchDirectories = new ArrayList<>();
 
         private boolean verbose;
+
+        private final List<String> compilerArgs = new ArrayList<>();
 
         @Inject
         protected abstract ObjectFactory getObjectFactory();
@@ -167,6 +170,7 @@ public abstract class AdlPluginExtension implements ExtensionAware
             return this;
         }
 
+        @Console
         public boolean isVerbose()
         {
             return verbose;
@@ -175,6 +179,18 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setVerbose(boolean verbose)
         {
             this.verbose = verbose;
+        }
+
+        @Input
+        public List<String> getCompilerArgs()
+        {
+            return compilerArgs;
+        }
+
+        public void setCompilerArgs(List<String> compilerArgs)
+        {
+            this.compilerArgs.clear();
+            this.compilerArgs.addAll(compilerArgs);
         }
     }
 
