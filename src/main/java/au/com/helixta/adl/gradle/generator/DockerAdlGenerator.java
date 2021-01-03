@@ -54,6 +54,7 @@ public class DockerAdlGenerator implements AdlGenerator
     private static final Logger log = Logging.getLogger(DockerAdlGenerator.class);
 
     private static final String TOOL_ADLC = "adlc";
+    private static final String TOOL_DOCKER = "docker";
 
     private final AdlToolLogger adlLog;
     private final DockerClient docker;
@@ -94,6 +95,12 @@ public class DockerAdlGenerator implements AdlGenerator
             c.withDockerCertPath(config.getCertPath().getAsFile().get().getAbsolutePath());
         if (config.getApiVersion() != null)
             c.withApiVersion(config.getApiVersion());
+        if (config.getRegistryUrl() != null)
+            c.withRegistryUrl(config.getRegistryUrl().toString());
+        if (config.getRegistryUsername() != null)
+            c.withRegistryUsername(config.getRegistryUsername());
+        if (config.getRegistryPassword() != null)
+            c.withRegistryPassword(config.getRegistryPassword());
 
         return c.build();
     }
@@ -101,7 +108,7 @@ public class DockerAdlGenerator implements AdlGenerator
     private void pullDockerImage(String imageName)
     throws AdlGenerationException
     {
-        adlLog.info(TOOL_ADLC, "Pulling docker image " + imageName + "...");
+        adlLog.info(TOOL_DOCKER, "Pulling docker image " + imageName + "...");
         ResultCallback.Adapter<PullResponseItem> pullResponse = docker.pullImageCmd(imageName).start();
         try
         {
@@ -111,7 +118,7 @@ public class DockerAdlGenerator implements AdlGenerator
         {
             throw new AdlGenerationException("Interrupted waiting for Docker pull.", e);
         }
-        adlLog.info(TOOL_ADLC, "Docker image downloaded.");
+        adlLog.info(TOOL_DOCKER, "Docker image downloaded.");
     }
 
     private void checkPullDockerImage(String imageName)

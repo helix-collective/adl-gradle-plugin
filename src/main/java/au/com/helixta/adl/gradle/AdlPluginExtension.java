@@ -320,6 +320,9 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private Boolean tlsVerify;
         private final DirectoryProperty certPath = getObjectFactory().directoryProperty();
         private RemoteApiVersion apiVersion;
+        private URI registryUrl;
+        private String registryUsername;
+        private String registryPassword;
 
         @Inject
         protected abstract ObjectFactory getObjectFactory();
@@ -388,6 +391,42 @@ public abstract class AdlPluginExtension implements ExtensionAware
                 this.apiVersion = null;
             else
                 this.apiVersion = RemoteApiVersion.parseConfig(apiVersion.toPlainString());
+        }
+
+        @Optional
+        @Internal
+        public URI getRegistryUrl()
+        {
+            return registryUrl;
+        }
+
+        public void setRegistryUrl(URI registryUrl)
+        {
+            this.registryUrl = registryUrl;
+        }
+
+        @Optional
+        @Internal
+        public String getRegistryUsername()
+        {
+            return registryUsername;
+        }
+
+        public void setRegistryUsername(String registryUsername)
+        {
+            this.registryUsername = registryUsername;
+        }
+
+        @Optional
+        @Internal
+        public String getRegistryPassword()
+        {
+            return registryPassword;
+        }
+
+        public void setRegistryPassword(String registryPassword)
+        {
+            this.registryPassword = registryPassword;
         }
     }
 }
