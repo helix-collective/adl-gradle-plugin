@@ -70,8 +70,6 @@ public class DockerAdlGenerator implements AdlGenerator
                                                        AdlToolLogger adlLog,
                                                        ObjectFactory objectFactory) //TODO input config
     {
-        System.out.println("Docker configuration: " + dockerConfiguration.getHost());
-
         DockerClientConfig config = dockerClientConfig(dockerConfiguration);
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
                                             .dockerHost(config.getDockerHost())
@@ -90,6 +88,10 @@ public class DockerAdlGenerator implements AdlGenerator
         //Augment with anything overridden from the docker configuration
         if (config.getHost() != null)
             c.withDockerHost(config.getHost().toString());
+        if (config.getTlsVerify() != null)
+            c.withDockerTlsVerify(config.getTlsVerify());
+        if (config.getCertPath().isPresent())
+            c.withDockerCertPath(config.getCertPath().getAsFile().get().getAbsolutePath());
 
         return c.build();
     }

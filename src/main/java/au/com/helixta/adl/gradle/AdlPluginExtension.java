@@ -154,6 +154,11 @@ public abstract class AdlPluginExtension implements ExtensionAware
             return outputDirectory;
         }
 
+        public void setOutputDirectory(File outputDirectory)
+        {
+            this.outputDirectory.fileValue(outputDirectory);
+        }
+
         @InputFiles
         @Optional
         public List<File> getSearchDirectories()
@@ -310,17 +315,48 @@ public abstract class AdlPluginExtension implements ExtensionAware
     public abstract static class DockerConfiguration
     {
         private URI host;
+        private Boolean tlsVerify;
+        private final DirectoryProperty certPath = getObjectFactory().directoryProperty();
 
+        @Inject
+        protected abstract ObjectFactory getObjectFactory();
+
+        @Inject
+        protected abstract ProjectLayout getProjectLayout();
+
+        @Optional
+        @Internal
         public URI getHost()
         {
             return host;
         }
 
-        @Optional
-        @Internal
         public void setHost(URI host)
         {
             this.host = host;
+        }
+
+        @Internal
+        public Boolean getTlsVerify()
+        {
+            return tlsVerify;
+        }
+
+        public void setTlsVerify(Boolean tlsVerify)
+        {
+            this.tlsVerify = tlsVerify;
+        }
+
+        @Optional
+        @Internal
+        public DirectoryProperty getCertPath()
+        {
+            return certPath;
+        }
+
+        public void setCertPath(File certPath)
+        {
+            this.certPath.fileValue(certPath);
         }
     }
 }
