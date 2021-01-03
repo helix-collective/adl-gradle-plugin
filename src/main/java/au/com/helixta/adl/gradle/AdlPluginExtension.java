@@ -1,5 +1,6 @@
 package au.com.helixta.adl.gradle;
 
+import com.github.dockerjava.core.RemoteApiVersion;
 import org.gradle.api.Action;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
@@ -25,6 +26,7 @@ import org.gradle.internal.Factory;
 
 import javax.inject.Inject;
 import java.io.File;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -317,6 +319,7 @@ public abstract class AdlPluginExtension implements ExtensionAware
         private URI host;
         private Boolean tlsVerify;
         private final DirectoryProperty certPath = getObjectFactory().directoryProperty();
+        private RemoteApiVersion apiVersion;
 
         @Inject
         protected abstract ObjectFactory getObjectFactory();
@@ -357,6 +360,34 @@ public abstract class AdlPluginExtension implements ExtensionAware
         public void setCertPath(File certPath)
         {
             this.certPath.fileValue(certPath);
+        }
+
+        @Optional
+        @Internal
+        public RemoteApiVersion getApiVersion()
+        {
+            return apiVersion;
+        }
+
+        public void setApiVersion(RemoteApiVersion apiVersion)
+        {
+            this.apiVersion = apiVersion;
+        }
+
+        public void setApiVersion(String apiVersion)
+        {
+            if (apiVersion == null)
+                this.apiVersion = null;
+            else
+                this.apiVersion = RemoteApiVersion.parseConfig(apiVersion);
+        }
+
+        public void setApiVersion(BigDecimal apiVersion)
+        {
+            if (apiVersion == null)
+                this.apiVersion = null;
+            else
+                this.apiVersion = RemoteApiVersion.parseConfig(apiVersion.toPlainString());
         }
     }
 }

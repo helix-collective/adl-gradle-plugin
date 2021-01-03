@@ -92,6 +92,8 @@ public class DockerAdlGenerator implements AdlGenerator
             c.withDockerTlsVerify(config.getTlsVerify());
         if (config.getCertPath().isPresent())
             c.withDockerCertPath(config.getCertPath().getAsFile().get().getAbsolutePath());
+        if (config.getApiVersion() != null)
+            c.withApiVersion(config.getApiVersion());
 
         return c.build();
     }
