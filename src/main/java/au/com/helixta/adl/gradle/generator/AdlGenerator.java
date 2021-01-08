@@ -4,6 +4,9 @@ import au.com.helixta.adl.gradle.AdlPluginExtension;
 
 import java.io.Closeable;
 
+/**
+ * Generates ADL.
+ */
 public interface AdlGenerator extends Closeable
 {
     public void generate(Iterable<? extends AdlPluginExtension.Generation> generations)

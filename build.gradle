@@ -1,6 +1,6 @@
 plugins {
     id 'java-gradle-plugin'
-    id 'maven'
+    id 'maven-publish'
 }
 group 'au.com.helixta.adl.gradle'
 version '0.0.1'
@@ -10,9 +10,9 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    compile group: 'com.github.docker-java', name: 'docker-java-core', version: '3.2.7'
-    compile group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: '3.2.7'
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+    implementation group: 'com.github.docker-java', name: 'docker-java-core', version: '3.2.7'
+    implementation group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: '3.2.7'
+    testImplementation group: 'junit', name: 'junit', version: '4.12'
 }
 gradlePlugin {
     plugins {

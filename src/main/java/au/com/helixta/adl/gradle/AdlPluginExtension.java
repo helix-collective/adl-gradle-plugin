@@ -67,7 +67,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
         protected abstract ObjectFactory getObjectFactory();
 
         @Nested
-        @SkipWhenEmpty
         public List<JavaGeneration> getJava()
         {
             return java;
@@ -330,7 +329,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
         @Inject
         protected abstract ProjectLayout getProjectLayout();
 
-        @Optional
         @Internal
         public URI getHost()
         {
@@ -353,7 +351,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
             this.tlsVerify = tlsVerify;
         }
 
-        @Optional
         @Internal
         public DirectoryProperty getCertPath()
         {
@@ -365,7 +362,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
             this.certPath.fileValue(certPath);
         }
 
-        @Optional
         @Internal
         public RemoteApiVersion getApiVersion()
         {
@@ -393,7 +389,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
                 this.apiVersion = RemoteApiVersion.parseConfig(apiVersion.toPlainString());
         }
 
-        @Optional
         @Internal
         public URI getRegistryUrl()
         {
@@ -405,7 +400,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
             this.registryUrl = registryUrl;
         }
 
-        @Optional
         @Internal
         public String getRegistryUsername()
         {
@@ -417,7 +411,6 @@ public abstract class AdlPluginExtension implements ExtensionAware
             this.registryUsername = registryUsername;
         }
 
-        @Optional
         @Internal
         public String getRegistryPassword()
         {
