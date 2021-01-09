@@ -1,0 +1,62 @@
+import au.com.helixta.adl.gradle.AdlGenerateJavaTask
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'au.com.helixta.adl.gradle:adl-gradle-plugin:0.0.1' // plugin’s artifact
+    }
+}
+
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(11)
+    }
+}
+
+apply plugin: 'au.com.helixta.adl' // applying plugin
+
+sourceSets {
+    main {
+        java {
+            srcDir 'generated/java'
+        }
+    }
+}
+
+clean {
+    delete "$projectDir/generated"
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.8.6'
+}
+
+task adlJava(type: AdlGenerateJavaTask) {
+    generations {
+        java {
+            outputDirectory = file("$projectDir/generated/java")
+            sourcepath file("$projectDir/src/main/adl")
+            javaPackage = "adl.test"
+            verbose = true
+            generateTransitive = true
+            generateAdlRuntime = true
+        }
+    }
+}
+
+compileJava.dependsOn(adlJava);
+
+task runGradleTest {
+    dependsOn compileJava
+}

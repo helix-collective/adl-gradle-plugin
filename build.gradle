@@ -1,6 +1,7 @@
 plugins {
     id 'java-gradle-plugin'
     id 'maven-publish'
+    id 'org.ysb33r.gradletest' version '2.0'
 }
 group 'au.com.helixta.adl.gradle'
 version '0.0.1'
@@ -21,4 +22,8 @@ gradlePlugin {
             implementationClass = 'au.com.helixta.adl.gradle.AdlGradlePlugin'
         }
     }
+}
+
+gradleTest {
+    versions '6.7.1'
 }
