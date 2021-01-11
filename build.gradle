@@ -13,7 +13,10 @@ repositories {
 dependencies {
     implementation group: 'com.github.docker-java', name: 'docker-java-core', version: '3.2.7'
     implementation group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: '3.2.7'
-    testImplementation group: 'junit', name: 'junit', version: '4.12'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
+    testImplementation 'org.assertj:assertj-core:3.18.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    gradleTest 'com.google.code.gson:gson:2.8.6'
 }
 gradlePlugin {
     plugins {
@@ -24,6 +27,16 @@ gradlePlugin {
     }
 }
 
+test {
+    useJUnitPlatform()
+}
+
 gradleTest {
     versions '6.7.1'
+
+    dependsOn jar
+
+    beforeTest {
+        println "  ${it.name}"
+    }
 }
