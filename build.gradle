@@ -15,6 +15,7 @@ dependencies {
     implementation group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: '3.2.7'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
     testImplementation 'org.assertj:assertj-core:3.18.1'
+    testImplementation 'com.github.javaparser:javaparser-core:3.18.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
     gradleTest 'com.google.code.gson:gson:2.8.6'
 }
@@ -32,11 +33,16 @@ test {
 }
 
 gradleTest {
-    versions '6.7.1'
+    versions '6.8'
 
     dependsOn jar
 
     beforeTest {
         println "  ${it.name}"
     }
+}
+
+// Make source files available as resources to tests
+processTestResources {
+    from sourceSets.main.allSource
 }
