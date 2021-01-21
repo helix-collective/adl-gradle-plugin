@@ -5,9 +5,6 @@ buildscript {
         mavenLocal()
         mavenCentral()
     }
-    dependencies {
-        classpath 'au.com.helixta.adl.gradle:adl-gradle-plugin:0.0.1' // plugin’s artifact
-    }
 }
 
 plugins {

@@ -37,10 +37,15 @@ gradleTest {
 
     dependsOn jar
 
+    kotlinDsl = true
+
     beforeTest {
         println "  ${it.name}"
     }
 }
+
+//Workaround for https://gitlab.com/ysb33rOrg/gradleTest/-/issues/120
+configurations.runtime.dependencies.addAll(configurations.runtimeClasspath.allDependencies)
 
 // Make source files available as resources to tests
 processTestResources {
