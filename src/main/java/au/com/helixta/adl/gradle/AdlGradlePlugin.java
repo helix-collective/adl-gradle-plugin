@@ -1,5 +1,6 @@
 package au.com.helixta.adl.gradle;
 
+import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -18,7 +19,7 @@ public class AdlGradlePlugin implements Plugin<Project>
 
     private void runAdl(Task task, AdlPluginExtension config)
     {
-        for (AdlPluginExtension.JavaGeneration generation : config.getGenerations().getJava())
+        for (JavaGenerationConfiguration generation : config.getGenerations().getJava())
         {
             generation.getOutputDirectory().convention(task.getProject().getLayout().getBuildDirectory().dir("generated/adl"));
             System.out.println("Generation: " + generation.getOutputDirectory().get());

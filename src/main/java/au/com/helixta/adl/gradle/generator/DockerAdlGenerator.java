@@ -1,6 +1,9 @@
 package au.com.helixta.adl.gradle.generator;
 
 import au.com.helixta.adl.gradle.AdlPluginExtension;
+import au.com.helixta.adl.gradle.config.DockerConfiguration;
+import au.com.helixta.adl.gradle.config.GenerationConfiguration;
+import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.async.ResultCallbackTemplate;
@@ -67,7 +70,7 @@ public class DockerAdlGenerator implements AdlGenerator
         this.objectFactory = Objects.requireNonNull(objectFactory);
     }
 
-    public static DockerAdlGenerator fromConfiguration(AdlPluginExtension.DockerConfiguration dockerConfiguration,
+    public static DockerAdlGenerator fromConfiguration(DockerConfiguration dockerConfiguration,
                                                        AdlToolLogger adlLog,
                                                        ObjectFactory objectFactory) //TODO input config
     {
@@ -81,7 +84,7 @@ public class DockerAdlGenerator implements AdlGenerator
          return new DockerAdlGenerator(docker, adlLog, objectFactory);
     }
 
-    private static DockerClientConfig dockerClientConfig(AdlPluginExtension.DockerConfiguration config)
+    private static DockerClientConfig dockerClientConfig(DockerConfiguration config)
     {
         //By default, everything configured from environment, such as environment variables
         DefaultDockerClientConfig.Builder c = DefaultDockerClientConfig.createDefaultConfigBuilder();
@@ -199,16 +202,16 @@ public class DockerAdlGenerator implements AdlGenerator
               .exec();
     }
 
-    private List<String> adlcCommand(AdlPluginExtension.Generation generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
+    private List<String> adlcCommand(GenerationConfiguration generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
     throws AdlGenerationException
     {
-        if (generation instanceof AdlPluginExtension.JavaGeneration)
-            return adlcJavaCommand((AdlPluginExtension.JavaGeneration)generation, sources, searchDirs);
+        if (generation instanceof JavaGenerationConfiguration)
+            return adlcJavaCommand((JavaGenerationConfiguration)generation, sources, searchDirs);
         else
             throw new AdlGenerationException("Unknown generation type: " + generation.getClass().getName());
     }
 
-    private List<String> adlcJavaCommand(AdlPluginExtension.JavaGeneration generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
+    private List<String> adlcJavaCommand(JavaGenerationConfiguration generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
     {
         List<String> command = new ArrayList<>();
         command.add("/opt/bin/adlc");
@@ -269,7 +272,7 @@ public class DockerAdlGenerator implements AdlGenerator
         return "/data/searchdirs/";
     }
 
-    private void runAdlc(AdlPluginExtension.Generation generation)
+    private void runAdlc(GenerationConfiguration generation)
     throws AdlGenerationException
     {
         //Generate archive for source files
@@ -372,9 +375,9 @@ public class DockerAdlGenerator implements AdlGenerator
 
             //and manifest file if they were required
             //TODO make this more generic
-            if (generation instanceof AdlPluginExtension.JavaGeneration)
+            if (generation instanceof JavaGenerationConfiguration)
             {
-                AdlPluginExtension.JavaGeneration javaGeneration = (AdlPluginExtension.JavaGeneration)generation;
+                JavaGenerationConfiguration javaGeneration = (JavaGenerationConfiguration)generation;
                 if (javaGeneration.getManifest().isPresent())
                 {
                     String manifestContainerPath = getManifestOutputPathInContainer();
@@ -444,7 +447,7 @@ public class DockerAdlGenerator implements AdlGenerator
         return generatedAdlFileCount;
     }
 
-    private int copyOutputFilesFromDockerContainer(AdlPluginExtension.Generation generation, String containerId)
+    private int copyOutputFilesFromDockerContainer(GenerationConfiguration generation, String containerId)
     throws AdlGenerationException
     {
         return copyFilesFromDockerContainer(getOutputPathInContainer(), generation.getOutputDirectory().get(), containerId);
@@ -467,13 +470,13 @@ public class DockerAdlGenerator implements AdlGenerator
     }
 
     @Override
-    public void generate(Iterable<? extends AdlPluginExtension.Generation> generations)
+    public void generate(Iterable<? extends GenerationConfiguration> generations)
     throws AdlGenerationException
     {
         //Check if the image exists, if not then pull it
         checkPullDockerImage(imageName());
 
-        for (AdlPluginExtension.Generation generation : generations)
+        for (GenerationConfiguration generation : generations)
         {
             runAdlc(generation);
         }

@@ -1,5 +1,8 @@
 package au.com.helixta.adl.gradle;
 
+import au.com.helixta.adl.gradle.config.DockerConfiguration;
+import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
+import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
 import au.com.helixta.adl.gradle.generator.ColoredAdlToolLogger;
@@ -18,8 +21,8 @@ import java.io.IOException;
 
 public class AdlGenerateJavaTask extends DefaultTask
 {
-    private final AdlPluginExtension.Generations generations = getObjectFactory().newInstance(AdlPluginExtension.Generations.class);
-    private final AdlPluginExtension.DockerConfiguration docker = getObjectFactory().newInstance(AdlPluginExtension.DockerConfiguration.class);
+    private final GenerationsConfiguration generations = getObjectFactory().newInstance(GenerationsConfiguration.class);
+    private final DockerConfiguration docker = getObjectFactory().newInstance(DockerConfiguration.class);
 
     @Inject
     protected ObjectFactory getObjectFactory()
@@ -34,23 +37,23 @@ public class AdlGenerateJavaTask extends DefaultTask
     }
 
     @Nested
-    public AdlPluginExtension.Generations getGenerations()
+    public GenerationsConfiguration getGenerations()
     {
         return generations;
     }
 
     @Nested
-    public AdlPluginExtension.DockerConfiguration getDocker()
+    public DockerConfiguration getDocker()
     {
         return docker;
     }
 
-    public void generations(Action<? super AdlPluginExtension.Generations> configuration)
+    public void generations(Action<? super GenerationsConfiguration> configuration)
     {
         configuration.execute(generations);
     }
 
-    public void docker(Action<? super AdlPluginExtension.DockerConfiguration> configuration)
+    public void docker(Action<? super DockerConfiguration> configuration)
     {
         configuration.execute(docker);
     }
@@ -61,7 +64,7 @@ public class AdlGenerateJavaTask extends DefaultTask
     {
         try (AdlGenerator generator = createGenerator())
         {
-            for (AdlPluginExtension.JavaGeneration java : getGenerations().getJava())
+            for (JavaGenerationConfiguration java : getGenerations().getJava())
             {
                 getLogger().warn("Generate java: " + java.getOutputDirectory().get());
                 getLogger().warn("   Files: " + java.getSourcepath().getFiles());

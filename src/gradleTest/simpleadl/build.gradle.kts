@@ -67,7 +67,6 @@ tasks {
 
     processTestResources {
         from(sourceSets.main.get().allSource)
-        //from sourceSets.main.allSource
     }
 
     register("runGradleTest") {

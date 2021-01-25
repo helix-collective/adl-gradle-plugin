@@ -5,11 +5,11 @@ plugins {
 }
 group 'au.com.helixta.adl.gradle'
 version '0.0.1'
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+
 repositories {
     mavenCentral()
 }
+
 dependencies {
     implementation group: 'com.github.docker-java', name: 'docker-java-core', version: '3.2.7'
     implementation group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: '3.2.7'
@@ -19,6 +19,7 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
     gradleTest 'com.google.code.gson:gson:2.8.6'
 }
+
 gradlePlugin {
     plugins {
         simplePlugin {
@@ -42,6 +43,20 @@ gradleTest {
     beforeTest {
         println "  ${it.name}"
     }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+javadoc {
+    options.outputLevel = JavadocOutputLevel.QUIET
+    options.quiet()
+    options.addStringOption('Xdoclint:none', '-quiet')
 }
 
 //Workaround for https://gitlab.com/ysb33rOrg/gradleTest/-/issues/120
