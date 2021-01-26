@@ -18,10 +18,9 @@ public abstract class JavaGenerationConfiguration extends GenerationConfiguratio
 
     private final RegularFileProperty manifest = getObjectFactory().fileProperty();
 
-    @Override
-    protected String generationType()
+    public JavaGenerationConfiguration()
     {
-        return "java";
+        super("java");
     }
 
     @Input

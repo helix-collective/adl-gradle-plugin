@@ -1,6 +1,6 @@
 package au.com.helixta.adl.gradle.generator;
 
-import au.com.helixta.adl.gradle.AdlPluginExtension;
+import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
@@ -202,16 +202,22 @@ public class DockerAdlGenerator implements AdlGenerator
               .exec();
     }
 
-    private List<String> adlcCommand(GenerationConfiguration generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
+    private List<String> adlcCommand(AdlConfiguration adlConfiguration,
+                                     GenerationConfiguration generation,
+                                     SourceTarArchive sources,
+                                     List<? extends SourceTarArchive> searchDirs)
     throws AdlGenerationException
     {
         if (generation instanceof JavaGenerationConfiguration)
-            return adlcJavaCommand((JavaGenerationConfiguration)generation, sources, searchDirs);
+            return adlcJavaCommand(adlConfiguration, (JavaGenerationConfiguration)generation, sources, searchDirs);
         else
             throw new AdlGenerationException("Unknown generation type: " + generation.getClass().getName());
     }
 
-    private List<String> adlcJavaCommand(JavaGenerationConfiguration generation, SourceTarArchive sources, List<? extends SourceTarArchive> searchDirs)
+    private List<String> adlcJavaCommand(AdlConfiguration adlConfiguration,
+                                         JavaGenerationConfiguration generation,
+                                         SourceTarArchive sources,
+                                         List<? extends SourceTarArchive> searchDirs)
     {
         List<String> command = new ArrayList<>();
         command.add("/opt/bin/adlc");
@@ -227,7 +233,7 @@ public class DockerAdlGenerator implements AdlGenerator
         if (generation.getJavaPackage() != null && !generation.getJavaPackage().trim().isEmpty())
             command.add("--package=" + generation.getJavaPackage());
 
-        if (generation.isVerbose())
+        if (adlConfiguration.isVerbose())
             command.add("--verbose");
 
         if (generation.isGenerateAdlRuntime())
@@ -272,16 +278,16 @@ public class DockerAdlGenerator implements AdlGenerator
         return "/data/searchdirs/";
     }
 
-    private void runAdlc(GenerationConfiguration generation)
+    private void runAdlc(AdlConfiguration adlConfiguration, GenerationConfiguration generation)
     throws AdlGenerationException
     {
         //Generate archive for source files
-        SourceTarArchive sourceTar = createTarFromFileTree(generation.getSourcepath(), getSourcePathInContainer());
+        SourceTarArchive sourceTar = createTarFromFileTree(adlConfiguration.getSourcepath(), getSourcePathInContainer());
 
         //and searchdirs
         List<SourceTarArchive> searchDirTars = new ArrayList<>();
         int searchDirIndex = 0;
-        for (File searchDirectory : generation.getSearchDirectories())
+        for (File searchDirectory : adlConfiguration.getSearchDirectories())
         {
             String searchDirContainerPath = getSearchDirectoryPathInContainer() + searchDirIndex + "/";
             ConfigurableFileTree searchDirTree = objectFactory.fileTree().from(searchDirectory);
@@ -291,7 +297,7 @@ public class DockerAdlGenerator implements AdlGenerator
         }
 
         //Put together the ADL command
-        List<String> adlcCommand = adlcCommand(generation, sourceTar, searchDirTars);
+        List<String> adlcCommand = adlcCommand(adlConfiguration, generation, sourceTar, searchDirTars);
         log.info("adlc command " + adlcCommand);
 
         //Create Docker container that can execute ADL compiler
@@ -470,7 +476,7 @@ public class DockerAdlGenerator implements AdlGenerator
     }
 
     @Override
-    public void generate(Iterable<? extends GenerationConfiguration> generations)
+    public void generate(AdlConfiguration configuration, Iterable<? extends GenerationConfiguration> generations)
     throws AdlGenerationException
     {
         //Check if the image exists, if not then pull it
@@ -478,7 +484,7 @@ public class DockerAdlGenerator implements AdlGenerator
 
         for (GenerationConfiguration generation : generations)
         {
-            runAdlc(generation);
+            runAdlc(configuration, generation);
         }
     }
 

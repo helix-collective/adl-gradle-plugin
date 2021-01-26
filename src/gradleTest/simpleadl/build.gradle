@@ -1,4 +1,4 @@
-import au.com.helixta.adl.gradle.AdlGenerateJavaTask
+import au.com.helixta.adl.gradle.AdlGenerateTask
 
 buildscript {
     repositories {
@@ -47,11 +47,11 @@ test {
     useJUnitPlatform()
 }
 
-task adlJava(type: AdlGenerateJavaTask) {
+task adlJava(type: AdlGenerateTask) {
+    sourcepath file("$projectDir/src/main/adl")
     generations {
         java {
             outputDirectory = file("$projectDir/generated/java")
-            sourcepath file("$projectDir/src/main/adl")
             javaPackage = "adl.test"
             verbose = true
             generateTransitive = true
