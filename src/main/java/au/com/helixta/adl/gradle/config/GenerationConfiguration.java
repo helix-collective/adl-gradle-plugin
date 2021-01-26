@@ -5,8 +5,6 @@ import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputDirectory;
-import org.gradle.api.tasks.util.PatternSet;
-import org.gradle.internal.Factory;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -16,6 +14,7 @@ import java.util.List;
 /**
  * Configuration common to all ADL code generation configuration, and may be used inside any generation configuration block.
  */
+@AdlDslMarker
 public abstract class GenerationConfiguration
 {
     private final DirectoryProperty outputDirectory;

@@ -9,6 +9,7 @@ import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 
+@AdlDslMarker
 public abstract class GenerationsConfiguration implements ExtensionAware
 {
     private final List<JavaGenerationConfiguration> java = new ArrayList<>();

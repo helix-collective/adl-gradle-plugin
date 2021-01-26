@@ -1,6 +1,7 @@
 package au.com.helixta.adl.gradle;
 
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
+import au.com.helixta.adl.gradle.config.AdlDslMarker;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+@AdlDslMarker
 public class AdlGenerateTask extends DefaultTask implements AdlConfiguration
 {
     private final GenerationsConfiguration generations = getObjectFactory().newInstance(GenerationsConfiguration.class);
