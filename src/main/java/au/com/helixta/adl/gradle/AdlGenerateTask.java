@@ -3,6 +3,7 @@ package au.com.helixta.adl.gradle;
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.AdlDslMarker;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
+import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
@@ -172,18 +173,19 @@ public class AdlGenerateTask extends DefaultTask implements AdlConfiguration
     }
 
     @TaskAction
-    public void generateJava()
+    public void generate()
     throws IOException, AdlGenerationException
     {
         try (AdlGenerator generator = createGenerator())
         {
-            for (JavaGenerationConfiguration java : getGenerations().getJava())
+            for (GenerationConfiguration gen : getGenerations().getAllGenerations())
             {
-                getLogger().warn("Generate java: " + java.getOutputDirectory().get());
+                getLogger().warn("Generate: " + gen.getOutputDirectory().get());
                 getLogger().warn("   Files: " + this.getSourcepath().getFiles());
                 getLogger().warn("   Search dirs: " + this.getSearchDirectories());
             }
-            generator.generate(this, getGenerations().getJava());
+
+            generator.generate(this, getGenerations().getAllGenerations());
         }
     }
 

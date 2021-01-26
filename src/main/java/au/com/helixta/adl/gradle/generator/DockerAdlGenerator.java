@@ -4,6 +4,7 @@ import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
+import au.com.helixta.adl.gradle.config.TypescriptGenerationConfiguration;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.async.ResultCallbackTemplate;
@@ -210,6 +211,8 @@ public class DockerAdlGenerator implements AdlGenerator
     {
         if (generation instanceof JavaGenerationConfiguration)
             return adlcJavaCommand(adlConfiguration, (JavaGenerationConfiguration)generation, sources, searchDirs);
+        else if (generation instanceof TypescriptGenerationConfiguration)
+            return adlcTypescriptCommand(adlConfiguration, (TypescriptGenerationConfiguration)generation, sources, searchDirs);
         else
             throw new AdlGenerationException("Unknown generation type: " + generation.getClass().getName());
     }
@@ -258,6 +261,44 @@ public class DockerAdlGenerator implements AdlGenerator
         return command;
     }
 
+    private List<String> adlcTypescriptCommand(AdlConfiguration adlConfiguration,
+                                               TypescriptGenerationConfiguration generation,
+                                               SourceTarArchive sources,
+                                               List<? extends SourceTarArchive> searchDirs)
+    {
+        List<String> command = new ArrayList<>();
+        command.add("/opt/bin/adlc");
+        command.add("typescript");
+
+        command.add("--outputdir=" + getOutputPathInContainer());
+
+        for (SourceTarArchive searchDir : searchDirs)
+        {
+            command.add("--searchdir=" + searchDir.getBaseDirectory());
+        }
+
+        if (adlConfiguration.isVerbose())
+            command.add("--verbose");
+
+        if (generation.isGenerateTransitive())
+            command.add("--generate-transitive");
+        if (generation.isGenerateResolver())
+            command.add("--include-resolver");
+        if (!generation.isGenerateAst())
+            command.add("--exclude-ast");
+
+        if (generation.isGenerateAdlRuntime())
+            command.add("--include-rt");
+        if (generation.getRuntimeDirectory().isPresent())
+            command.add("--runtime-dir=" + getRuntimeOutputPathInContainer());
+
+        command.addAll(generation.getCompilerArgs());
+
+        command.addAll(sources.getFilePaths());
+
+        return command;
+    }
+
     protected String getSourcePathInContainer()
     {
         return "/data/sources/";
@@ -266,6 +307,11 @@ public class DockerAdlGenerator implements AdlGenerator
     protected String getOutputPathInContainer()
     {
         return "/data/generated/";
+    }
+
+    protected String getRuntimeOutputPathInContainer()
+    {
+        return "/data/generated-runtime/";
     }
 
     protected String getManifestOutputPathInContainer()
@@ -379,6 +425,16 @@ public class DockerAdlGenerator implements AdlGenerator
             int generatedAdlFileCount = copyOutputFilesFromDockerContainer(generation, containerId);
             log.info(generatedAdlFileCount + " ADL file(s) generated.");
 
+            if (generation instanceof TypescriptGenerationConfiguration)
+            {
+                TypescriptGenerationConfiguration typescriptGeneration = (TypescriptGenerationConfiguration)generation;
+                if (typescriptGeneration.getRuntimeDirectory().isPresent())
+                {
+                    int generatedRuntimeAdlFileCount = copyRuntimeOutputFilesFromDockerContainer(typescriptGeneration, containerId);
+                    log.info(generatedRuntimeAdlFileCount + " runtime ADL file(s) generated.");
+                }
+            }
+
             //and manifest file if they were required
             //TODO make this more generic
             if (generation instanceof JavaGenerationConfiguration)
@@ -457,6 +513,12 @@ public class DockerAdlGenerator implements AdlGenerator
     throws AdlGenerationException
     {
         return copyFilesFromDockerContainer(getOutputPathInContainer(), generation.getOutputDirectory().get(), containerId);
+    }
+
+    private int copyRuntimeOutputFilesFromDockerContainer(TypescriptGenerationConfiguration generation, String containerId)
+    throws AdlGenerationException
+    {
+        return copyFilesFromDockerContainer(getRuntimeOutputPathInContainer(), generation.getRuntimeDirectory().get(), containerId);
     }
 
     private static String relativizeTarPath(String expectedBase, String entryName)
