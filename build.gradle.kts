@@ -47,11 +47,10 @@ tasks {
         dependsOn(jar)
         kotlinDsl = true
 
-        /*
-        beforeTest {
-            println "  ${it.name}"
-        }
-         */
+        //Print names of tests before they run
+        beforeTest(closureOf<TestDescriptor>{
+            logger.lifecycle("\t${this.name}")
+        })
     }
 
     javadoc {
