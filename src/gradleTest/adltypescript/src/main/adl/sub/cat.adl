@@ -1,0 +1,9 @@
+module sub {
+
+/// Puss, puss, puss
+struct Cat {
+    String name;
+    Int32 age;
+};
+
+};
