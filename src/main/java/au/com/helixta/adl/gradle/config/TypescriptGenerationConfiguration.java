@@ -13,7 +13,7 @@ public abstract class TypescriptGenerationConfiguration extends GenerationConfig
     private boolean generateTransitive;
     private boolean generateResolver;
     private boolean generateAst = true;
-    private final DirectoryProperty runtimeDirectory = getObjectFactory().directoryProperty();
+    private String runtimeModuleName = "runtime";
 
     public TypescriptGenerationConfiguration()
     {
@@ -65,14 +65,14 @@ public abstract class TypescriptGenerationConfiguration extends GenerationConfig
     }
 
     @Optional
-    @OutputDirectory
-    public DirectoryProperty getRuntimeDirectory()
+    @Input
+    public String getRuntimeModuleName()
     {
-        return runtimeDirectory;
+        return runtimeModuleName;
     }
 
-    public void setRuntimeDirectory(File runtimeDirectory)
+    public void setRuntimeModuleName(String runtimeModuleName)
     {
-        this.runtimeDirectory.fileValue(runtimeDirectory);
+        this.runtimeModuleName = runtimeModuleName;
     }
 }

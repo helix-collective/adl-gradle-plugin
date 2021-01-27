@@ -289,8 +289,8 @@ public class DockerAdlGenerator implements AdlGenerator
 
         if (generation.isGenerateAdlRuntime())
             command.add("--include-rt");
-        if (generation.getRuntimeDirectory().isPresent())
-            command.add("--runtime-dir=" + getRuntimeOutputPathInContainer());
+        if (generation.getRuntimeModuleName() != null)
+            command.add("--runtime-dir=" + generation.getRuntimeModuleName());
 
         command.addAll(generation.getCompilerArgs());
 
@@ -307,11 +307,6 @@ public class DockerAdlGenerator implements AdlGenerator
     protected String getOutputPathInContainer()
     {
         return "/data/generated/";
-    }
-
-    protected String getRuntimeOutputPathInContainer()
-    {
-        return "/data/generated-runtime/";
     }
 
     protected String getManifestOutputPathInContainer()
@@ -425,16 +420,6 @@ public class DockerAdlGenerator implements AdlGenerator
             int generatedAdlFileCount = copyOutputFilesFromDockerContainer(generation, containerId);
             log.info(generatedAdlFileCount + " ADL file(s) generated.");
 
-            if (generation instanceof TypescriptGenerationConfiguration)
-            {
-                TypescriptGenerationConfiguration typescriptGeneration = (TypescriptGenerationConfiguration)generation;
-                if (typescriptGeneration.getRuntimeDirectory().isPresent())
-                {
-                    int generatedRuntimeAdlFileCount = copyRuntimeOutputFilesFromDockerContainer(typescriptGeneration, containerId);
-                    log.info(generatedRuntimeAdlFileCount + " runtime ADL file(s) generated.");
-                }
-            }
-
             //and manifest file if they were required
             //TODO make this more generic
             if (generation instanceof JavaGenerationConfiguration)
@@ -513,12 +498,6 @@ public class DockerAdlGenerator implements AdlGenerator
     throws AdlGenerationException
     {
         return copyFilesFromDockerContainer(getOutputPathInContainer(), generation.getOutputDirectory().get(), containerId);
-    }
-
-    private int copyRuntimeOutputFilesFromDockerContainer(TypescriptGenerationConfiguration generation, String containerId)
-    throws AdlGenerationException
-    {
-        return copyFilesFromDockerContainer(getRuntimeOutputPathInContainer(), generation.getRuntimeDirectory().get(), containerId);
     }
 
     private static String relativizeTarPath(String expectedBase, String entryName)
