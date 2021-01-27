@@ -30,7 +30,7 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         return typescript;
     }
 
-    public List<? extends GenerationConfiguration> getAllGenerations()
+    public List<? extends GenerationConfiguration> allGenerations()
     {
         List<GenerationConfiguration> all = new ArrayList<>(java.size() + typescript.size());
         all.addAll(getJava());

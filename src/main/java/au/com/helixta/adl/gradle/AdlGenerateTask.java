@@ -178,14 +178,14 @@ public class AdlGenerateTask extends DefaultTask implements AdlConfiguration
     {
         try (AdlGenerator generator = createGenerator())
         {
-            for (GenerationConfiguration gen : getGenerations().getAllGenerations())
+            for (GenerationConfiguration gen : getGenerations().allGenerations())
             {
                 getLogger().warn("Generate: " + gen.getOutputDirectory().get());
                 getLogger().warn("   Files: " + this.getSourcepath().getFiles());
                 getLogger().warn("   Search dirs: " + this.getSearchDirectories());
             }
 
-            generator.generate(this, getGenerations().getAllGenerations());
+            generator.generate(this, getGenerations().allGenerations());
         }
     }
 
