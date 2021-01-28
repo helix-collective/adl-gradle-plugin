@@ -4,6 +4,7 @@ import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
+import au.com.helixta.adl.gradle.config.ManifestGenerationSupport;
 import au.com.helixta.adl.gradle.config.TypescriptGenerationConfiguration;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
@@ -421,14 +422,13 @@ public class DockerAdlGenerator implements AdlGenerator
             log.info(generatedAdlFileCount + " ADL file(s) generated.");
 
             //and manifest file if they were required
-            //TODO make this more generic
-            if (generation instanceof JavaGenerationConfiguration)
+            if (generation instanceof ManifestGenerationSupport)
             {
-                JavaGenerationConfiguration javaGeneration = (JavaGenerationConfiguration)generation;
-                if (javaGeneration.getManifest().isPresent())
+                ManifestGenerationSupport manifestGeneration = (ManifestGenerationSupport)generation;
+                if (manifestGeneration.getManifest().isPresent())
                 {
                     String manifestContainerPath = getManifestOutputPathInContainer();
-                    File manifestFileOnHost = javaGeneration.getManifest().get().getAsFile();
+                    File manifestFileOnHost = manifestGeneration.getManifest().get().getAsFile();
                     Directory manifestDirOnHost = objectFactory.directoryProperty().fileValue(manifestFileOnHost.getParentFile()).get();
                     int generatedManifestFileCount = copyFilesFromDockerContainer(manifestContainerPath, manifestDirOnHost, containerId,
                                                                                   (dir, name) -> new File(dir, name).equals(manifestFileOnHost));

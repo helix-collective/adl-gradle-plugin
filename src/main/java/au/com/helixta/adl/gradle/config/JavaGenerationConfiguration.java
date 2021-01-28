@@ -7,7 +7,7 @@ import org.gradle.api.tasks.OutputFile;
 
 import java.io.File;
 
-public abstract class JavaGenerationConfiguration extends GenerationConfiguration
+public abstract class JavaGenerationConfiguration extends GenerationConfiguration implements ManifestGenerationSupport
 {
     private String javaPackage;
     private String adlRuntimePackage;
@@ -80,6 +80,7 @@ public abstract class JavaGenerationConfiguration extends GenerationConfiguratio
         this.suppressWarningsAnnotation = suppressWarningsAnnotation;
     }
 
+    @Override
     @OutputFile
     @Optional
     public RegularFileProperty getManifest()

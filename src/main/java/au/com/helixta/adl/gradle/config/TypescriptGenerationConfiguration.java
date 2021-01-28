@@ -1,19 +1,21 @@
 package au.com.helixta.adl.gradle.config;
 
-import org.gradle.api.file.DirectoryProperty;
+import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Optional;
-import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.OutputFile;
 
 import java.io.File;
 
-public abstract class TypescriptGenerationConfiguration extends GenerationConfiguration
+public abstract class TypescriptGenerationConfiguration extends GenerationConfiguration implements ManifestGenerationSupport
 {
     private boolean generateAdlRuntime;
     private boolean generateTransitive;
     private boolean generateResolver;
     private boolean generateAst = true;
     private String runtimeModuleName = "runtime";
+
+    private final RegularFileProperty manifest = getObjectFactory().fileProperty();
 
     public TypescriptGenerationConfiguration()
     {
@@ -74,5 +76,18 @@ public abstract class TypescriptGenerationConfiguration extends GenerationConfig
     public void setRuntimeModuleName(String runtimeModuleName)
     {
         this.runtimeModuleName = runtimeModuleName;
+    }
+
+    @Override
+    @OutputFile
+    @Optional
+    public RegularFileProperty getManifest()
+    {
+        return manifest;
+    }
+
+    public void setManifest(File manifestFile)
+    {
+        manifest.fileValue(manifestFile);
     }
 }
