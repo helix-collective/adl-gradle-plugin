@@ -44,6 +44,13 @@ val adlJava = tasks.register<AdlGenerateTask>("adlJava") {
             isGenerateAdlRuntime = true
             manifest.set(file("$projectDir/generated/manifest/adl-java"))
         }
+        typescript {
+            outputDirectory.set(file("$projectDir/generated/typescript"))
+            isGenerateTransitive = true
+            isGenerateAdlRuntime = true
+            isGenerateResolver = true
+            manifest.set(file("$projectDir/generated/manifest/adl-typescript"))
+        }
     }
 }
 
