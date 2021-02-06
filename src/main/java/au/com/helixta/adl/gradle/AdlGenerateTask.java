@@ -2,186 +2,80 @@ package au.com.helixta.adl.gradle;
 
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.AdlDslMarker;
-import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
-import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
-import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
 import au.com.helixta.adl.gradle.generator.ColoredAdlToolLogger;
 import au.com.helixta.adl.gradle.generator.DockerAdlGenerator;
-import org.gradle.api.Action;
-import org.gradle.api.DefaultTask;
-import org.gradle.api.file.ConfigurableFileCollection;
-import org.gradle.api.file.FileCollection;
-import org.gradle.api.file.FileTree;
+import org.gradle.api.file.ArchiveOperations;
+import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.api.model.ObjectFactory;
-import org.gradle.api.tasks.Console;
-import org.gradle.api.tasks.InputFiles;
-import org.gradle.api.tasks.Nested;
-import org.gradle.api.tasks.Optional;
-import org.gradle.api.tasks.PathSensitive;
-import org.gradle.api.tasks.PathSensitivity;
+import org.gradle.api.tasks.SourceTask;
 import org.gradle.api.tasks.TaskAction;
-import org.gradle.api.tasks.util.PatternSet;
-import org.gradle.internal.Factory;
+import org.gradle.initialization.GradleUserHomeDirProvider;
 import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
 
 import javax.inject.Inject;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 @AdlDslMarker
-public class AdlGenerateTask extends DefaultTask implements AdlConfiguration
+public abstract class AdlGenerateTask extends SourceTask implements AdlConfiguration, AdlExtension
 {
-    private final GenerationsConfiguration generations = getObjectFactory().newInstance(GenerationsConfiguration.class);
-    private final DockerConfiguration docker = getObjectFactory().newInstance(DockerConfiguration.class);
-
-    private final ConfigurableFileCollection sourcepath = getObjectFactory().fileCollection();
-    private final PatternSet patternSet = getPatternSetFactory().create().include("**/*.adl");
-    private final List<File> searchDirectories = new ArrayList<>();
-    private boolean verbose;
+    @Inject
+    protected abstract ObjectFactory getObjectFactory();
 
     @Inject
-    protected ObjectFactory getObjectFactory()
-    {
-        throw new UnsupportedOperationException();
-    }
+    protected abstract StyledTextOutputFactory getStyledTextOutputFactory();
 
     @Inject
-    protected Factory<PatternSet> getPatternSetFactory()
-    {
-        throw new UnsupportedOperationException();
-    }
+    protected abstract GradleUserHomeDirProvider getGradleUserHomeDirProvider();
 
     @Inject
-    protected StyledTextOutputFactory getStyledTextOutputFactory()
-    {
-        throw new UnsupportedOperationException();
-    }
+    protected abstract FileSystemOperations getFileSystemOperations();
 
-    @Nested
-    public GenerationsConfiguration getGenerations()
-    {
-        return generations;
-    }
+    @Inject
+    protected abstract ArchiveOperations getArchiveOperations();
 
-    @Nested
-    public DockerConfiguration getDocker()
+    public AdlGenerateTask()
     {
-        return docker;
-    }
-
-    public void generations(Action<? super GenerationsConfiguration> configuration)
-    {
-        configuration.execute(generations);
-    }
-
-    public void docker(Action<? super DockerConfiguration> configuration)
-    {
-        configuration.execute(docker);
-    }
-
-    @PathSensitive(PathSensitivity.RELATIVE)
-    @InputFiles
-    @Override
-    public FileTree getSourcepath()
-    {
-        return sourcepath.getAsFileTree().matching(patternSet);
-    }
-
-    public void sourcepath(File... sources)
-    {
-        sourcepath.from((Object[]) sources);
-    }
-
-    public void sourcepath(FileCollection... sources)
-    {
-        sourcepath.from((Object[]) sources);
-    }
-
-    public AdlGenerateTask include(String... includes)
-    {
-        patternSet.include(includes);
-        return this;
-    }
-
-    public AdlGenerateTask include(Iterable<String> includes)
-    {
-        patternSet.include(includes);
-        return this;
-    }
-
-    public AdlGenerateTask exclude(String... excludes)
-    {
-        patternSet.exclude(excludes);
-        return this;
-    }
-
-    public AdlGenerateTask exclude(Iterable<String> excludes)
-    {
-        patternSet.exclude(excludes);
-        return this;
-    }
-
-    @InputFiles
-    @Optional
-    @Override
-    public List<File> getSearchDirectories()
-    {
-        return searchDirectories;
-    }
-
-    public AdlGenerateTask searchDirectory(File... dirs)
-    {
-        searchDirectories.addAll(Arrays.asList(dirs));
-        return this;
-    }
-
-    public AdlGenerateTask searchDirectory(FileCollection... dirs)
-    {
-        for (FileCollection dir : dirs)
-        {
-            //For collections, pull out top-level dir and use that
-            dir.getAsFileTree().visit(d ->
-                                      {
-                                          if (d.isDirectory())
-                                          {
-                                              searchDirectories.add(d.getFile());
-                                              d.stopVisiting();
-                                          }
-                                      });
-        }
-        return this;
-    }
-
-    @Console
-    @Override
-    public boolean isVerbose()
-    {
-        return verbose;
-    }
-
-    public void setVerbose(boolean verbose)
-    {
-        this.verbose = verbose;
+        //TODO does a default pattern belong here or in the source set definition?
+        include("**/*.adl");
     }
 
     @TaskAction
     public void generate()
     throws IOException, AdlGenerationException
     {
+        /*
+        //TODO temp
+        AdlExtension adlExtension = getProject().getExtensions().getByType(AdlExtension.class);
+        System.out.println("Docker host configued in ADL section: " + adlExtension.getDocker().getHost());
+
+        try
+        {
+            AdlDistributionService adlDistributionService = new AdlDistributionService(getGradleUserHomeDirProvider(), getFileSystemOperations(), getArchiveOperations(), getProject());
+            File adlDir = adlDistributionService.adlDistribution(new AdlDistributionSpec("0.14", "amd64", "linux"));
+            System.out.println("ADL dir: " + adlDir);
+        }
+        catch (AdlDistributionNotFoundException e)
+        {
+            throw new RuntimeException(e);
+        }
+         */
+
+
         try (AdlGenerator generator = createGenerator())
         {
             for (GenerationConfiguration gen : getGenerations().allGenerations())
             {
                 getLogger().warn("Generate: " + gen.getOutputDirectory().get());
-                getLogger().warn("   Files: " + this.getSourcepath().getFiles());
+                getLogger().warn("   Files: " + this.getSource().getFiles());
                 getLogger().warn("   Search dirs: " + this.getSearchDirectories());
             }
 

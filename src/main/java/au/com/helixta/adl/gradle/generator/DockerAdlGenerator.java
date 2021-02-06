@@ -327,12 +327,12 @@ public class DockerAdlGenerator implements AdlGenerator
     throws AdlGenerationException
     {
         //Generate archive for source files
-        SourceTarArchive sourceTar = createTarFromFileTree(adlConfiguration.getSourcepath(), getSourcePathInContainer());
+        SourceTarArchive sourceTar = createTarFromFileTree(adlConfiguration.getSource(), getSourcePathInContainer());
 
         //and searchdirs
         List<SourceTarArchive> searchDirTars = new ArrayList<>();
         int searchDirIndex = 0;
-        for (File searchDirectory : adlConfiguration.getSearchDirectories())
+        for (File searchDirectory : adlConfiguration.getSearchDirectories().get())
         {
             String searchDirContainerPath = getSearchDirectoryPathInContainer() + searchDirIndex + "/";
             ConfigurableFileTree searchDirTree = objectFactory.fileTree().from(searchDirectory);

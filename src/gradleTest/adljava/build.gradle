@@ -48,7 +48,7 @@ test {
 }
 
 task adlJava(type: AdlGenerateTask) {
-    sourcepath file("$projectDir/src/main/adl")
+    source file("$projectDir/src/main/adl")
     generations {
         java {
             outputDirectory = file("$projectDir/generated/java")

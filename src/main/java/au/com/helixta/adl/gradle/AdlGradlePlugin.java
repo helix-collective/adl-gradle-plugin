@@ -10,11 +10,15 @@ public class AdlGradlePlugin implements Plugin<Project>
     @Override
     public void apply(Project project)
     {
+        AdlExtension extension = project.getExtensions().create("adl", AdlExtension.class);
+
+        /*
         AdlPluginExtension extension = project.getExtensions()
                                               .create("adl", AdlPluginExtension.class);
 
         project.task("adl")
                .doLast(task -> this.runAdl(task, extension));
+         */
     }
 
     private void runAdl(Task task, AdlPluginExtension config)

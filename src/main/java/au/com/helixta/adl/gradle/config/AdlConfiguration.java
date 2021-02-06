@@ -1,13 +1,13 @@
 package au.com.helixta.adl.gradle.config;
 
 import org.gradle.api.file.FileTree;
+import org.gradle.api.provider.ListProperty;
 
 import java.io.File;
-import java.util.List;
 
 public interface AdlConfiguration
 {
-    public FileTree getSourcepath();
-    public List<File> getSearchDirectories();
+    public FileTree getSource();
+    public ListProperty<File> getSearchDirectories();
     public boolean isVerbose();
 }
