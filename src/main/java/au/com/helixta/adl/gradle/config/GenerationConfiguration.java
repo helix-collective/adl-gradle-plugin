@@ -1,7 +1,6 @@
 package au.com.helixta.adl.gradle.config;
 
 import org.gradle.api.file.DirectoryProperty;
-import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputDirectory;
@@ -19,18 +18,16 @@ public abstract class GenerationConfiguration
 {
     private final DirectoryProperty outputDirectory;
     private final List<String> compilerArgs = new ArrayList<>();
+    private final String generationType;
 
     protected GenerationConfiguration(String generationType)
     {
-        outputDirectory = getObjectFactory().directoryProperty()
-                            .convention(getProjectLayout().getBuildDirectory().dir("generated/adl/" + generationType));
+        this.generationType = generationType;
+        outputDirectory = getObjectFactory().directoryProperty();
     }
 
     @Inject
     protected abstract ObjectFactory getObjectFactory();
-
-    @Inject
-    protected abstract ProjectLayout getProjectLayout();
 
     @OutputDirectory
     public DirectoryProperty getOutputDirectory()
@@ -53,5 +50,16 @@ public abstract class GenerationConfiguration
     {
         this.compilerArgs.clear();
         this.compilerArgs.addAll(compilerArgs);
+    }
+
+    public String generationType()
+    {
+        return generationType;
+    }
+
+    protected void baseCopyFrom(GenerationConfiguration other)
+    {
+        outputDirectory.set(other.outputDirectory);
+        compilerArgs.addAll(other.compilerArgs);
     }
 }

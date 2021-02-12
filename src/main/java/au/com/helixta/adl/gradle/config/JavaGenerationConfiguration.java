@@ -104,4 +104,17 @@ public abstract class JavaGenerationConfiguration extends GenerationConfiguratio
     {
         this.headerComment = headerComment;
     }
+
+    public JavaGenerationConfiguration copyFrom(JavaGenerationConfiguration other)
+    {
+        super.baseCopyFrom(other);
+        setJavaPackage(other.getJavaPackage());
+        setAdlRuntimePackage(other.getAdlRuntimePackage());
+        setGenerateAdlRuntime(other.isGenerateAdlRuntime());
+        setGenerateTransitive(other.isGenerateTransitive());
+        setSuppressWarningsAnnotation(other.getSuppressWarningsAnnotation());
+        setManifest(other.getManifest().getAsFile().getOrNull());
+        setHeaderComment(other.getHeaderComment());
+        return this;
+    }
 }

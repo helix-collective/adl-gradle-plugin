@@ -60,4 +60,12 @@ public interface AdlExtension
         }
     }
 
+    public default AdlExtension copyFrom(AdlExtension other)
+    {
+        setVerbose(other.isVerbose());
+        getSearchDirectories().addAll(other.getSearchDirectories());
+        getGenerations().copyFrom(other.getGenerations());
+        getDocker().copyFrom(other.getDocker());
+        return this;
+    }
 }

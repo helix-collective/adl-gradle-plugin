@@ -90,4 +90,16 @@ public abstract class TypescriptGenerationConfiguration extends GenerationConfig
     {
         manifest.fileValue(manifestFile);
     }
+
+    public TypescriptGenerationConfiguration copyFrom(TypescriptGenerationConfiguration other)
+    {
+        super.baseCopyFrom(other);
+        setGenerateAdlRuntime(other.isGenerateAdlRuntime());
+        setGenerateTransitive(other.isGenerateTransitive());
+        setGenerateResolver(other.isGenerateResolver());
+        setGenerateAst(other.isGenerateAst());
+        setRuntimeModuleName(other.getRuntimeModuleName());
+        setManifest(other.getManifest().getAsFile().getOrNull());
+        return this;
+    }
 }

@@ -51,4 +51,17 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         configuration.execute(t);
         typescript.add(t);
     }
+
+    public GenerationsConfiguration copyFrom(GenerationsConfiguration other)
+    {
+        for (JavaGenerationConfiguration otherConfig : other.getJava())
+        {
+            this.java(thisConfig -> thisConfig.copyFrom(otherConfig));
+        }
+        for (TypescriptGenerationConfiguration otherConfig : other.getTypescript())
+        {
+            this.typescript(thisConfig -> thisConfig.copyFrom(otherConfig));
+        }
+        return this;
+    }
 }

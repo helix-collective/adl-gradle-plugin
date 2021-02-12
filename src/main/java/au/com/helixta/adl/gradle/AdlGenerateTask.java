@@ -2,14 +2,14 @@ package au.com.helixta.adl.gradle;
 
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.AdlDslMarker;
+import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
+import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
 import au.com.helixta.adl.gradle.generator.ColoredAdlToolLogger;
 import au.com.helixta.adl.gradle.generator.DockerAdlGenerator;
+import org.gradle.api.Action;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.logging.LogLevel;
@@ -21,7 +21,6 @@ import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
 
 import javax.inject.Inject;
-import java.io.File;
 import java.io.IOException;
 
 @AdlDslMarker
@@ -41,6 +40,9 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
 
     @Inject
     protected abstract ArchiveOperations getArchiveOperations();
+
+    private GenerationsConfiguration generations = getObjectFactory().newInstance(GenerationsConfiguration.class);
+    private DockerConfiguration docker = getObjectFactory().newInstance(DockerConfiguration.class);
 
     public AdlGenerateTask()
     {
@@ -89,5 +91,39 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.INFO);
         StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.ERROR);
         return DockerAdlGenerator.fromConfiguration(getDocker(), new ColoredAdlToolLogger(out, err), getObjectFactory());
+    }
+
+    @Override
+    public GenerationsConfiguration getGenerations()
+    {
+        return generations;
+    }
+
+    @Override
+    public DockerConfiguration getDocker()
+    {
+        return docker;
+    }
+
+    public void setGenerations(GenerationsConfiguration generations)
+    {
+        this.generations = generations;
+    }
+
+    public void setDocker(DockerConfiguration docker)
+    {
+        this.docker = docker;
+    }
+
+    @Override
+    public void generations(Action<? super GenerationsConfiguration> configuration)
+    {
+        configuration.execute(generations);
+    }
+
+    @Override
+    public void docker(Action<? super DockerConfiguration> configuration)
+    {
+        configuration.execute(docker);
     }
 }

@@ -127,4 +127,15 @@ public abstract class DockerConfiguration
     {
         this.registryPassword = registryPassword;
     }
+
+    public void copyFrom(DockerConfiguration other)
+    {
+        setHost(other.getHost());
+        setTlsVerify(other.getTlsVerify());
+        getCertPath().set(other.getCertPath());
+        setApiVersion(other.getApiVersion());
+        setRegistryUrl(other.getRegistryUrl());
+        setRegistryUsername(other.getRegistryUsername());
+        setRegistryPassword(other.getRegistryPassword());
+    }
 }
