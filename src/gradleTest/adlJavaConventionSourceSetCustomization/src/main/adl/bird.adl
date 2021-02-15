@@ -1,0 +1,8 @@
+module sub2 {
+
+struct Bird {
+    String name;
+    Int32 age;
+};
+
+};

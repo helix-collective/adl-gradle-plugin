@@ -1,0 +1,9 @@
+module sub3 {
+
+/// Woof, woof
+struct Dog {
+    String name;
+    Int32 age;
+};
+
+};
