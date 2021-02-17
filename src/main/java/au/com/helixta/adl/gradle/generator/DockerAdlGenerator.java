@@ -3,9 +3,7 @@ package au.com.helixta.adl.gradle.generator;
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
-import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
 import au.com.helixta.adl.gradle.config.ManifestGenerationSupport;
-import au.com.helixta.adl.gradle.config.TypescriptGenerationConfiguration;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.async.ResultCallbackTemplate;
@@ -21,15 +19,6 @@ import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.gradle.api.file.ConfigurableFileTree;
-import org.gradle.api.file.Directory;
-import org.gradle.api.file.FileTree;
-import org.gradle.api.file.RelativePath;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
@@ -37,20 +26,16 @@ import org.gradle.api.model.ObjectFactory;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOError;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -64,6 +49,8 @@ public class DockerAdlGenerator implements AdlGenerator
     private final AdlToolLogger adlLog;
     private final DockerClient docker;
     private final ObjectFactory objectFactory;
+
+    private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
 
     public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, ObjectFactory objectFactory)
     {
@@ -144,165 +131,6 @@ public class DockerAdlGenerator implements AdlGenerator
         return "helixta/hxadl:0.31.1"; //TODO parameterize version
     }
 
-    private SourceTarArchive createTarFromFileTree(FileTree sources, String basePath)
-    throws AdlGenerationException
-    {
-        List<String> filesInContainer = new ArrayList<>();
-
-        //Generate TAR archive
-        ByteArrayOutputStream tarBos = new ByteArrayOutputStream();
-        try (TarArchiveOutputStream tarOs = new TarArchiveOutputStream(tarBos, "UTF-8"))
-        {
-            sources.visit(fileVisitDetails ->
-            {
-                String tarEntryFilePath = basePath + fileVisitDetails.getRelativePath().getPathString();
-                if (fileVisitDetails.isDirectory() && !tarEntryFilePath.endsWith("/")) //TAR library makes anything ending with '/' a directory
-                    tarEntryFilePath = tarEntryFilePath + "/";
-
-                TarArchiveEntry tarEntry = new TarArchiveEntry(tarEntryFilePath);
-
-                tarEntry.setModTime(fileVisitDetails.getLastModified());
-                if (!fileVisitDetails.isDirectory())
-                    tarEntry.setSize(fileVisitDetails.getSize());
-
-                try
-                {
-                    tarOs.putArchiveEntry(tarEntry);
-                    if (!fileVisitDetails.isDirectory())
-                    {
-                        filesInContainer.add(tarEntryFilePath);
-                        try (InputStream entryFileIs = fileVisitDetails.open())
-                        {
-                            IOUtils.copy(entryFileIs, tarOs);
-                        }
-                    }
-                    tarOs.closeArchiveEntry();
-                }
-                catch (IOException e)
-                {
-                    throw new AdlGenerationRuntimeException(new AdlGenerationException("Error generating TAR file with ADL source files: " + e.getMessage(), e));
-                }
-            });
-        }
-        catch (IOException e)
-        {
-            throw new AdlGenerationException("Error generating TAR file with ADL source files: " + e.getMessage(), e);
-        }
-        catch (AdlGenerationRuntimeException e)
-        {
-            throw e.getCheckedException();
-        }
-
-        return new SourceTarArchive(new ByteArrayInputStream(tarBos.toByteArray()), basePath, filesInContainer);
-    }
-
-    private void copySourceFilesToDockerContainer(SourceTarArchive sources, String dockerContainerId)
-    {
-        docker.copyArchiveToContainerCmd(dockerContainerId)
-              .withRemotePath("/") //All paths in TAR are absolute for the container
-              .withTarInputStream(sources.getInputStream())
-              .exec();
-    }
-
-    private List<String> adlcCommand(AdlConfiguration adlConfiguration,
-                                     GenerationConfiguration generation,
-                                     SourceTarArchive sources,
-                                     List<? extends SourceTarArchive> searchDirs)
-    throws AdlGenerationException
-    {
-        if (generation instanceof JavaGenerationConfiguration)
-            return adlcJavaCommand(adlConfiguration, (JavaGenerationConfiguration)generation, sources, searchDirs);
-        else if (generation instanceof TypescriptGenerationConfiguration)
-            return adlcTypescriptCommand(adlConfiguration, (TypescriptGenerationConfiguration)generation, sources, searchDirs);
-        else
-            throw new AdlGenerationException("Unknown generation type: " + generation.getClass().getName());
-    }
-
-    private List<String> adlcJavaCommand(AdlConfiguration adlConfiguration,
-                                         JavaGenerationConfiguration generation,
-                                         SourceTarArchive sources,
-                                         List<? extends SourceTarArchive> searchDirs)
-    {
-        List<String> command = new ArrayList<>();
-        command.add("/opt/bin/adlc");
-        command.add("java");
-
-        command.add("--outputdir=" + getOutputPathInContainer());
-
-        for (SourceTarArchive searchDir : searchDirs)
-        {
-            command.add("--searchdir=" + searchDir.getBaseDirectory());
-        }
-
-        if (generation.getJavaPackage() != null && !generation.getJavaPackage().trim().isEmpty())
-            command.add("--package=" + generation.getJavaPackage());
-
-        if (adlConfiguration.isVerbose())
-            command.add("--verbose");
-
-        if (generation.isGenerateAdlRuntime())
-            command.add("--include-rt");
-        if (generation.getAdlRuntimePackage() != null && !generation.getAdlRuntimePackage().isEmpty())
-            command.add("--rtpackage=" + generation.getAdlRuntimePackage());
-
-        if (generation.isGenerateTransitive())
-            command.add("--generate-transitive");
-        if (generation.getSuppressWarningsAnnotation() != null && !generation.getSuppressWarningsAnnotation().isEmpty())
-            command.add("--suppress-warnings-annotation=" + generation.getSuppressWarningsAnnotation());
-        if (generation.getHeaderComment() != null && !generation.getHeaderComment().isEmpty())
-            command.add("--header-comment=" + generation.getHeaderComment());
-
-        if (generation.getManifest().isPresent())
-            command.add("--manifest=" + getManifestOutputPathInContainer() + generation.getManifest().get().getAsFile().getName());
-
-        command.addAll(generation.getCompilerArgs());
-
-        command.addAll(sources.getFilePaths());
-
-        return command;
-    }
-
-    private List<String> adlcTypescriptCommand(AdlConfiguration adlConfiguration,
-                                               TypescriptGenerationConfiguration generation,
-                                               SourceTarArchive sources,
-                                               List<? extends SourceTarArchive> searchDirs)
-    {
-        List<String> command = new ArrayList<>();
-        command.add("/opt/bin/adlc");
-        command.add("typescript");
-
-        command.add("--outputdir=" + getOutputPathInContainer());
-
-        for (SourceTarArchive searchDir : searchDirs)
-        {
-            command.add("--searchdir=" + searchDir.getBaseDirectory());
-        }
-
-        if (adlConfiguration.isVerbose())
-            command.add("--verbose");
-
-        if (generation.isGenerateTransitive())
-            command.add("--generate-transitive");
-        if (generation.isGenerateResolver())
-            command.add("--include-resolver");
-        if (!generation.isGenerateAst())
-            command.add("--exclude-ast");
-
-        if (generation.isGenerateAdlRuntime())
-            command.add("--include-rt");
-        if (generation.getRuntimeModuleName() != null)
-            command.add("--runtime-dir=" + generation.getRuntimeModuleName());
-
-        if (generation.getManifest().isPresent())
-            command.add("--manifest=" + getManifestOutputPathInContainer() + generation.getManifest().get().getAsFile().getName());
-
-        command.addAll(generation.getCompilerArgs());
-
-        command.addAll(sources.getFilePaths());
-
-        return command;
-    }
-
     protected String getSourcePathInContainer()
     {
         return "/data/sources/";
@@ -326,23 +154,38 @@ public class DockerAdlGenerator implements AdlGenerator
     private void runAdlc(AdlConfiguration adlConfiguration, GenerationConfiguration generation)
     throws AdlGenerationException
     {
+        DockerFileSystemMapper dockerFileSystemMapper = new DockerFileSystemMapper(objectFactory, docker);
+
         //Generate archive for source files
-        SourceTarArchive sourceTar = createTarFromFileTree(adlConfiguration.getSource(), getSourcePathInContainer());
+        dockerFileSystemMapper.addInputFiles(new FileSystemMapper.LabelledFileTree(AdlFileTreeLabel.SOURCES, adlConfiguration.getSource()),
+                                             getSourcePathInContainer());
 
         //and searchdirs
-        List<SourceTarArchive> searchDirTars = new ArrayList<>();
         int searchDirIndex = 0;
         for (File searchDirectory : adlConfiguration.getSearchDirectories().get())
         {
             String searchDirContainerPath = getSearchDirectoryPathInContainer() + searchDirIndex + "/";
-            ConfigurableFileTree searchDirTree = objectFactory.fileTree().from(searchDirectory);
-            SourceTarArchive searchDirTar = createTarFromFileTree(searchDirTree, searchDirContainerPath);
-            searchDirTars.add(searchDirTar);
+            dockerFileSystemMapper.addInputFiles(searchDirectory, searchDirContainerPath);
             searchDirIndex++;
         }
 
+        //Register output files
+        dockerFileSystemMapper.registerOutputDirectory(generation.getOutputDirectory().get(), getOutputPathInContainer());
+        if (generation instanceof ManifestGenerationSupport)
+        {
+            ManifestGenerationSupport manifestGeneration = (ManifestGenerationSupport)generation;
+            if (manifestGeneration.getManifest().isPresent())
+            {
+                File manifestFileOnHost = manifestGeneration.getManifest().get().getAsFile();
+                String manifestContainerFile = getManifestOutputPathInContainer() + manifestFileOnHost.getName();
+                dockerFileSystemMapper.registerOutputFile(manifestGeneration.getManifest().get(), manifestContainerFile);
+            }
+        }
+
         //Put together the ADL command
-        List<String> adlcCommand = adlcCommand(adlConfiguration, generation, sourceTar, searchDirTars);
+        List<String> adlcCommand = new ArrayList<>();
+        adlcCommand.add("/opt/bin/adlc");
+        adlcCommand.addAll(adlcCommandProcessor.createAdlcCommand(adlConfiguration, generation, dockerFileSystemMapper));
         log.info("adlc command " + adlcCommand);
 
         //Create Docker container that can execute ADL compiler
@@ -358,11 +201,7 @@ public class DockerAdlGenerator implements AdlGenerator
         try
         {
             //Copy source files to the container
-            copySourceFilesToDockerContainer(sourceTar, containerId);
-            for (SourceTarArchive searchDirTar : searchDirTars)
-            {
-                copySourceFilesToDockerContainer(searchDirTar, containerId);
-            }
+            dockerFileSystemMapper.copyFilesToContainer(containerId);
 
             //Reading console output from the process
             //Don't log directly from the callback because it's on another thread and Gradle has a threadlocal to group task-specific logs
@@ -421,23 +260,22 @@ public class DockerAdlGenerator implements AdlGenerator
                 throw new AdlGenerationException("adlc error (" + result + ")");
 
             //Copy generated files back out of container
-            int generatedAdlFileCount = copyOutputFilesFromDockerContainer(generation, containerId);
-            log.info(generatedAdlFileCount + " ADL file(s) generated.");
+            Map<File, Integer> copyCounts = new HashMap<>(dockerFileSystemMapper.copyFilesFromContainer(containerId));
 
-            //and manifest file if they were required
+            //Log the files that were generated
             if (generation instanceof ManifestGenerationSupport)
             {
                 ManifestGenerationSupport manifestGeneration = (ManifestGenerationSupport)generation;
                 if (manifestGeneration.getManifest().isPresent())
                 {
-                    String manifestContainerPath = getManifestOutputPathInContainer();
-                    File manifestFileOnHost = manifestGeneration.getManifest().get().getAsFile();
-                    Directory manifestDirOnHost = objectFactory.directoryProperty().fileValue(manifestFileOnHost.getParentFile()).get();
-                    int generatedManifestFileCount = copyFilesFromDockerContainer(manifestContainerPath, manifestDirOnHost, containerId,
-                                                                                  (dir, name) -> new File(dir, name).equals(manifestFileOnHost));
+                    Integer generatedManifestFileCount = copyCounts.remove(manifestGeneration.getManifest().get().getAsFile());
+                    if (generatedManifestFileCount == null)
+                        generatedManifestFileCount = 0;
                     log.info(generatedManifestFileCount + " manifest file(s) generated.");
                 }
             }
+            int generatedOtherFileCount = copyCounts.values().stream().mapToInt(Integer::valueOf).sum();
+            log.info(generatedOtherFileCount + " " + generation.generationType() + " source file(s) generated.");
         }
         finally
         {
@@ -452,71 +290,6 @@ public class DockerAdlGenerator implements AdlGenerator
                 log.error("Error removing adlc Docker container " + containerId + ": " + e.getMessage(), e);
             }
         }
-    }
-
-    private int copyFilesFromDockerContainer(String containerDirectory, Directory hostOutputDirectory, String containerId)
-    throws AdlGenerationException
-    {
-        return copyFilesFromDockerContainer(containerDirectory, hostOutputDirectory, containerId, (dir, name) -> true);
-    }
-
-    private int copyFilesFromDockerContainer(String containerDirectory, Directory hostOutputDirectory, String containerId, FilenameFilter filter)
-    throws AdlGenerationException
-    {
-        int generatedAdlFileCount = 0;
-
-        try (InputStream is = docker.copyArchiveFromContainerCmd(containerId, containerDirectory).exec();
-             TarArchiveInputStream tis = new TarArchiveInputStream(is))
-        {
-            TarArchiveEntry entry;
-            do
-            {
-                entry = tis.getNextTarEntry();
-                if (entry != null && !entry.isDirectory())
-                {
-                    //Docker TAR archives have the last segment of the base directory in the TAR archive, so strip that out
-                    String relativeName = relativizeTarPath(containerDirectory, entry.getName());
-
-                    //Copy the file data to the host filesystem
-                    File adlOutputFile = hostOutputDirectory.file(relativeName).getAsFile();
-                    if (filter.accept(adlOutputFile.getParentFile(), adlOutputFile.getName()))
-                    {
-                        FileUtils.forceMkdirParent(adlOutputFile);
-                        Files.copy(tis, adlOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        generatedAdlFileCount++;
-                    }
-                }
-            }
-            while (entry != null);
-        }
-        catch (IOException e)
-        {
-            throw new AdlGenerationException(e);
-        }
-
-        return generatedAdlFileCount;
-    }
-
-    private int copyOutputFilesFromDockerContainer(GenerationConfiguration generation, String containerId)
-    throws AdlGenerationException
-    {
-        return copyFilesFromDockerContainer(getOutputPathInContainer(), generation.getOutputDirectory().get(), containerId);
-    }
-
-    private static String relativizeTarPath(String expectedBase, String entryName)
-    {
-        //Docker puts the last segment of the base in the TAR entry, so remove it
-        String lastBasePathSegment = RelativePath.parse(false, expectedBase).getLastName();
-
-        RelativePath entryPath = RelativePath.parse(true, entryName);
-
-        if (entryPath.getSegments()[0].equals(lastBasePathSegment))
-        {
-            RelativePath adjustedEntryPath = new RelativePath(true, Arrays.copyOfRange(entryPath.getSegments(), 1, entryPath.getSegments().length));
-            return adjustedEntryPath.getPathString();
-        }
-        else //No adjustment needed
-            return entryName;
     }
 
     @Override
@@ -536,22 +309,6 @@ public class DockerAdlGenerator implements AdlGenerator
     public void close() throws IOException
     {
         docker.close();
-    }
-
-    private static class AdlGenerationRuntimeException extends RuntimeException
-    {
-        private final AdlGenerationException checkedException;
-
-        public AdlGenerationRuntimeException(AdlGenerationException cause)
-        {
-            super(cause);
-            this.checkedException = Objects.requireNonNull(cause);
-        }
-
-        public AdlGenerationException getCheckedException()
-        {
-            return checkedException;
-        }
     }
 
     private static class ConsoleRecorder
@@ -635,42 +392,6 @@ public class DockerAdlGenerator implements AdlGenerator
                 //In-memory, should not happen
                 throw new IOError(e);
             }
-        }
-    }
-
-    private static class SourceTarArchive implements Closeable
-    {
-        private final InputStream inputStream;
-        private final String baseDirectory;
-        private final List<String> filePaths;
-
-        public SourceTarArchive(InputStream inputStream, String baseDirectory, List<String> filePaths)
-        {
-            this.inputStream = inputStream;
-            this.baseDirectory = baseDirectory;
-            this.filePaths = new ArrayList<>(filePaths);
-        }
-
-        public InputStream getInputStream()
-        {
-            return inputStream;
-        }
-
-        public String getBaseDirectory()
-        {
-            return baseDirectory;
-        }
-
-        public List<String> getFilePaths()
-        {
-            return filePaths;
-        }
-
-        @Override
-        public void close()
-        throws IOException
-        {
-            inputStream.close();
         }
     }
 }
