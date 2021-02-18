@@ -5,10 +5,12 @@ import au.com.helixta.adl.gradle.config.AdlDslMarker;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
 import au.com.helixta.adl.gradle.generator.ColoredAdlToolLogger;
 import au.com.helixta.adl.gradle.generator.DockerAdlGenerator;
+import au.com.helixta.adl.gradle.generator.NativeAdlGenerator;
 import org.gradle.api.Action;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileSystemOperations;
@@ -19,6 +21,7 @@ import org.gradle.api.tasks.TaskAction;
 import org.gradle.initialization.GradleUserHomeDirProvider;
 import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
+import org.gradle.process.ExecOperations;
 
 import javax.inject.Inject;
 import java.io.IOException;
@@ -40,6 +43,9 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
 
     @Inject
     protected abstract ArchiveOperations getArchiveOperations();
+
+    @Inject
+    protected abstract ExecOperations getExecOperations();
 
     private GenerationsConfiguration generations = getObjectFactory().newInstance(GenerationsConfiguration.class);
     private DockerConfiguration docker = getObjectFactory().newInstance(DockerConfiguration.class);
@@ -91,6 +97,11 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.INFO);
         StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.ERROR);
         return DockerAdlGenerator.fromConfiguration(getDocker(), new ColoredAdlToolLogger(out, err), getObjectFactory());
+
+        /*
+        AdlDistributionService adlDistributionService = new AdlDistributionService(getGradleUserHomeDirProvider(), getFileSystemOperations(), getArchiveOperations(), getProject());
+        return new NativeAdlGenerator(getExecOperations(), adlDistributionService, new ColoredAdlToolLogger(out, err));
+         */
     }
 
     @Override
