@@ -74,7 +74,9 @@ public class NativeAdlGenerator implements AdlGenerator
                     //Occurs when process execution fails
 
                     //Certain versions of adlc log everything to stdout - in the case of errors send this all to adlLog.error too
-                    if (errors.isEmpty() && !infos.isEmpty())
+                    //if infos weren't actually being logged
+                    //This is so the user doesn't just see an error that adlc failed without any reason/cause from the process
+                    if (errors.isEmpty() && !infos.isEmpty() && !adlLog.isInfoEnabled())
                     {
                         for (String info : infos)
                         {

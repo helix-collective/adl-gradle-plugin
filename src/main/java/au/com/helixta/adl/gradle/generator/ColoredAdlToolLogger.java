@@ -6,11 +6,13 @@ public class ColoredAdlToolLogger implements AdlToolLogger
 {
     private final StyledTextOutput out;
     private final StyledTextOutput err;
+    private final boolean outLoggingEnabled;
 
-    public ColoredAdlToolLogger(StyledTextOutput out, StyledTextOutput err)
+    public ColoredAdlToolLogger(StyledTextOutput out, StyledTextOutput err, boolean outLoggingEnabled)
     {
         this.out = out;
         this.err = err;
+        this.outLoggingEnabled = outLoggingEnabled;
     }
 
     @Override
@@ -31,5 +33,11 @@ public class ColoredAdlToolLogger implements AdlToolLogger
            .style(StyledTextOutput.Style.Error)
            .text(message)
            .println();
+    }
+
+    @Override
+    public boolean isInfoEnabled()
+    {
+        return outLoggingEnabled;
     }
 }

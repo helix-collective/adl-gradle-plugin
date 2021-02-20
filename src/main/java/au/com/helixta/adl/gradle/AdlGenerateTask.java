@@ -96,11 +96,11 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         //TODO configuration option to fallback to plain output
         StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.INFO);
         StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.ERROR);
-        return DockerAdlGenerator.fromConfiguration(getDocker(), new ColoredAdlToolLogger(out, err), getObjectFactory());
+        return DockerAdlGenerator.fromConfiguration(getDocker(), new ColoredAdlToolLogger(out, err, getProject().getLogger().isEnabled(LogLevel.INFO)), getObjectFactory());
 
         /*
         AdlDistributionService adlDistributionService = new AdlDistributionService(getGradleUserHomeDirProvider(), getFileSystemOperations(), getArchiveOperations(), getProject());
-        return new NativeAdlGenerator(getExecOperations(), adlDistributionService, new ColoredAdlToolLogger(out, err));
+        return new NativeAdlGenerator(getExecOperations(), adlDistributionService, new ColoredAdlToolLogger(out, err, getProject().getLogger().isEnabled(LogLevel.INFO)));
          */
     }
 

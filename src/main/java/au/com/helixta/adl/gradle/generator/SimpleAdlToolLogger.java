@@ -1,5 +1,6 @@
 package au.com.helixta.adl.gradle.generator;
 
+import org.gradle.api.logging.LogLevel;
 import org.gradle.api.logging.Logger;
 
 import java.util.Objects;
@@ -28,5 +29,11 @@ public class SimpleAdlToolLogger implements AdlToolLogger
     protected String formatMessage(String toolName, String message)
     {
         return toolName + "> " + message;
+    }
+
+    @Override
+    public boolean isInfoEnabled()
+    {
+        return log.isEnabled(LogLevel.INFO);
     }
 }
