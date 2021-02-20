@@ -20,6 +20,8 @@ public class LineProcessingOutputStream extends OutputStream
     private final CharBuffer cbuf;
     private final CharsetDecoder decoder;
 
+    private boolean closed;
+
     private final Consumer<String> lineProcessor;
 
     public LineProcessingOutputStream(Charset charset, Consumer<String> lineProcessor)
@@ -38,7 +40,7 @@ public class LineProcessingOutputStream extends OutputStream
     }
 
     @Override
-    public void write(int b) throws IOException
+    public synchronized void write(int b) throws IOException
     {
         buf.put((byte)b);
         buf.flip();
@@ -59,8 +61,11 @@ public class LineProcessingOutputStream extends OutputStream
     }
 
     @Override
-    public void close() throws IOException
+    public synchronized void close() throws IOException
     {
+        if (closed)
+            return;
+
         buf.flip();
 
         CoderResult result = decoder.decode(buf, cbuf, true);
@@ -77,6 +82,8 @@ public class LineProcessingOutputStream extends OutputStream
             result = decoder.flush(cbuf);
         }
         processLines(true);
+
+        closed = true;
     }
 
     private void processLines(boolean force)
