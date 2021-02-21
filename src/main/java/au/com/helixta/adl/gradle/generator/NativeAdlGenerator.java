@@ -6,6 +6,8 @@ import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
 import org.gradle.api.GradleException;
+import org.gradle.nativeplatform.platform.OperatingSystem;
+import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform;
 import org.gradle.process.ExecOperations;
 
 import java.io.File;
@@ -35,8 +37,24 @@ public class NativeAdlGenerator implements AdlGenerator
 
     protected AdlDistributionSpec adlDistributionSpecForConfiguration(AdlConfiguration configuration)
     {
-        //TODO unhardcode
-        return new AdlDistributionSpec("0.14", "amd64", "linux");
+        OperatingSystem os = org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem();
+        String arch = DefaultNativePlatform.getCurrentArchitecture().getName();
+
+        //os.getName() matches what the ADL distribution binaries have
+        return new AdlDistributionSpec(configuration.getVersion(), arch, os.getName());
+    }
+
+    /**
+     * Downloads and unpacks an ADL distribution for the current platform.
+     *
+     * @param configuration ADL configuration.
+     *
+     * @return the unpacked ADL distribution directory.
+     */
+    public File resolveAdlDistribution(AdlConfiguration configuration)
+    throws AdlDistributionNotFoundException, IOException
+    {
+        return adlDistributionService.adlDistribution(adlDistributionSpecForConfiguration(configuration));
     }
 
     @Override
@@ -45,7 +63,7 @@ public class NativeAdlGenerator implements AdlGenerator
     {
         try
         {
-            File adlBinaryDir = adlDistributionService.adlDistribution(adlDistributionSpecForConfiguration(configuration));
+            File adlBinaryDir = resolveAdlDistribution(configuration);
             File adlExecutable = new File(new File(adlBinaryDir, "bin"), "adlc"); //TODO windows suffix, etc.
 
             for (GenerationConfiguration generation : generations)

@@ -2,9 +2,11 @@ package au.com.helixta.adl.gradle;
 
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.AdlDslMarker;
+import au.com.helixta.adl.gradle.config.AdlPlatform;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
@@ -60,24 +62,6 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
     public void generate()
     throws IOException, AdlGenerationException
     {
-        /*
-        //TODO temp
-        AdlExtension adlExtension = getProject().getExtensions().getByType(AdlExtension.class);
-        System.out.println("Docker host configued in ADL section: " + adlExtension.getDocker().getHost());
-
-        try
-        {
-            AdlDistributionService adlDistributionService = new AdlDistributionService(getGradleUserHomeDirProvider(), getFileSystemOperations(), getArchiveOperations(), getProject());
-            File adlDir = adlDistributionService.adlDistribution(new AdlDistributionSpec("0.14", "amd64", "linux"));
-            System.out.println("ADL dir: " + adlDir);
-        }
-        catch (AdlDistributionNotFoundException e)
-        {
-            throw new RuntimeException(e);
-        }
-         */
-
-
         try (AdlGenerator generator = createGenerator())
         {
             for (GenerationConfiguration gen : getGenerations().allGenerations())
@@ -92,16 +76,47 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
     }
 
     private AdlGenerator createGenerator()
+    throws IOException
     {
-        //TODO configuration option to fallback to plain output
         StyledTextOutput out = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.INFO);
         StyledTextOutput err = getStyledTextOutputFactory().create(AdlGenerateTask.class, LogLevel.ERROR);
-        return DockerAdlGenerator.fromConfiguration(getDocker(), new ColoredAdlToolLogger(out, err, getProject().getLogger().isEnabled(LogLevel.INFO)), getObjectFactory());
+        ColoredAdlToolLogger adlLogger = new ColoredAdlToolLogger(out, err, getProject().getLogger().isEnabled(LogLevel.INFO));
 
-        /*
         AdlDistributionService adlDistributionService = new AdlDistributionService(getGradleUserHomeDirProvider(), getFileSystemOperations(), getArchiveOperations(), getProject());
-        return new NativeAdlGenerator(getExecOperations(), adlDistributionService, new ColoredAdlToolLogger(out, err, getProject().getLogger().isEnabled(LogLevel.INFO)));
-         */
+        NativeAdlGenerator nativeAdlGenerator = new NativeAdlGenerator(getExecOperations(), adlDistributionService, adlLogger);
+
+        AdlPlatform platform = getPlatform();
+        if (platform == null)
+            platform = AdlPlatform.AUTO;
+
+        if (platform == AdlPlatform.AUTO)
+        {
+            try
+            {
+                nativeAdlGenerator.resolveAdlDistribution(this);
+
+                //Successfully resolved, use native
+                platform = AdlPlatform.NATIVE;
+            }
+            catch (AdlDistributionNotFoundException e)
+            {
+                //Not found - fallback to docker
+                platform = AdlPlatform.DOCKER;
+            }
+
+            getLogger().info("Selected ADL platform: " + platform);
+        }
+
+        switch (platform)
+        {
+            case DOCKER:
+                //TODO configuration option to fallback to plain output
+                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, getObjectFactory());
+            case NATIVE:
+                return nativeAdlGenerator;
+            default:
+                throw new RuntimeException("Unknown ADL platform selected: " + platform);
+        }
     }
 
     @Override

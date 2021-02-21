@@ -10,4 +10,9 @@ public interface AdlConfiguration
     public FileTree getSource();
     public ListProperty<File> getSearchDirectories();
     public boolean isVerbose();
+
+    /**
+     * @return the version of ADL to use.
+     */
+    public String getVersion();
 }

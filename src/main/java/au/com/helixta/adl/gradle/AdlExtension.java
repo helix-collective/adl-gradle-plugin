@@ -1,12 +1,15 @@
 package au.com.helixta.adl.gradle;
 
+import au.com.helixta.adl.gradle.config.AdlPlatform;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
 import org.gradle.api.Action;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.tasks.Console;
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
 
@@ -60,9 +63,31 @@ public interface AdlExtension
         }
     }
 
+    /**
+     * @return the version of ADL to use.
+     *
+     * @see <a href="https://github.com/timbod7/adl/releases">ADL Releases</a>
+     */
+    @Input
+    public String getVersion();
+
+    /**
+     * Sets the version of ADL to use.
+     *
+     * @see <a href="https://github.com/timbod7/adl/releases">ADL Releases</a>
+     */
+    public void setVersion(String version);
+
+    @Internal
+    @Optional
+    public AdlPlatform getPlatform();
+
+    public void setPlatform(AdlPlatform platform);
+
     public default AdlExtension copyFrom(AdlExtension other)
     {
         setVerbose(other.isVerbose());
+        setVersion(other.getVersion());
         getSearchDirectories().addAll(other.getSearchDirectories());
         getGenerations().copyFrom(other.getGenerations());
         getDocker().copyFrom(other.getDocker());
