@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Set;
 
 public class AdlDistributionService
@@ -47,10 +48,10 @@ public class AdlDistributionService
     private AdlDistributionSpec normalizeSpec(AdlDistributionSpec spec)
     {
         String arch = spec.getArchitecture();
-        if ("x86_64".equals(spec.getArchitecture()))
+        if ("x86_64".equals(spec.getArchitecture()) || "x86-64".equals(spec.getArchitecture()))
             arch = "amd64";
 
-        String os = spec.getOs();
+        String os = spec.getOs().toLowerCase(Locale.ROOT);
         if (os.contains("mac os x") || os.contains("darwin") || os.contains("osx"))
             os = "osx";
         else if (os.contains("linux"))
