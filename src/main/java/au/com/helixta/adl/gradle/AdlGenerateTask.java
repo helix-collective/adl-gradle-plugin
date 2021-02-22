@@ -103,9 +103,8 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
                 //Not found - fallback to docker
                 platform = AdlPlatform.DOCKER;
             }
-
-            getLogger().info("Selected ADL platform: " + platform);
         }
+        getLogger().info("Selected ADL platform: " + platform);
 
         switch (platform)
         {

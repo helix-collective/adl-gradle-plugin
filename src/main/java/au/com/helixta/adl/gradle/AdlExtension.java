@@ -88,6 +88,7 @@ public interface AdlExtension
     {
         setVerbose(other.isVerbose());
         setVersion(other.getVersion());
+        setPlatform(other.getPlatform());
         getSearchDirectories().addAll(other.getSearchDirectories());
         getGenerations().copyFrom(other.getGenerations());
         getDocker().copyFrom(other.getDocker());
