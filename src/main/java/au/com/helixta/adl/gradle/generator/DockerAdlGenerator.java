@@ -4,11 +4,18 @@ import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.ManifestGenerationSupport;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
+import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.async.ResultCallbackTemplate;
+import com.github.dockerjava.api.command.BuildImageResultCallback;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.exception.DockerException;
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.BuildResponseItem;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Image;
@@ -19,9 +26,15 @@ import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableSet;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
+import org.gradle.nativeplatform.MachineArchitecture;
+import org.gradle.nativeplatform.OperatingSystemFamily;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -32,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,21 +61,24 @@ public class DockerAdlGenerator implements AdlGenerator
     private static final String TOOL_DOCKER = "docker";
 
     private final AdlToolLogger adlLog;
+    private final AdlDistributionService adlDistributionService;
     private final DockerClient docker;
     private final ObjectFactory objectFactory;
 
     private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
 
-    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, ObjectFactory objectFactory)
+    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, AdlDistributionService adlDistributionService, ObjectFactory objectFactory)
     {
         this.docker = Objects.requireNonNull(docker);
         this.adlLog = Objects.requireNonNull(adlLog);
+        this.adlDistributionService = Objects.requireNonNull(adlDistributionService);
         this.objectFactory = Objects.requireNonNull(objectFactory);
     }
 
     public static DockerAdlGenerator fromConfiguration(DockerConfiguration dockerConfiguration,
                                                        AdlToolLogger adlLog,
-                                                       ObjectFactory objectFactory) //TODO input config
+                                                       AdlDistributionService adlDistributionService,
+                                                       ObjectFactory objectFactory)
     {
         DockerClientConfig config = dockerClientConfig(dockerConfiguration);
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
@@ -70,7 +87,7 @@ public class DockerAdlGenerator implements AdlGenerator
                                             .build();
 
          DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
-         return new DockerAdlGenerator(docker, adlLog, objectFactory);
+         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, objectFactory);
     }
 
     private static DockerClientConfig dockerClientConfig(DockerConfiguration config)
@@ -97,11 +114,41 @@ public class DockerAdlGenerator implements AdlGenerator
         return c.build();
     }
 
-    private void pullDockerImage(String imageName)
+    private boolean pullDockerImage(String imageName)
     throws AdlGenerationException
     {
         adlLog.info(TOOL_DOCKER, "Pulling docker image " + imageName + "...");
-        ResultCallback.Adapter<PullResponseItem> pullResponse = docker.pullImageCmd(imageName).start();
+        ResultCallback.Adapter<PullResponseItem> pullResponse = docker.pullImageCmd(imageName).exec(new PullImageResultCallback()
+        {
+            private Throwable firstError;
+
+            @Override
+            public void onError(Throwable throwable)
+            {
+                //Sadly need to replicate a whole lot of code from ResultCallbackTemplate
+                //Want to have same logic except that annoying logging
+                if (this.firstError == null)
+                    this.firstError = throwable;
+
+                try
+                {
+                    close();
+                }
+                catch (IOException e)
+                {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            protected void throwFirstError()
+            {
+                if (firstError != null)
+                {
+                    Throwables.propagateIfPossible(firstError);
+                    throw new RuntimeException(firstError);
+                }
+            }
+        });
         try
         {
             pullResponse.awaitCompletion(); //TODO timeouts
@@ -110,15 +157,23 @@ public class DockerAdlGenerator implements AdlGenerator
         {
             throw new AdlGenerationException("Interrupted waiting for Docker pull.", e);
         }
+        catch (NotFoundException e)
+        {
+            //Docker image not found remotely
+            return false;
+        }
         adlLog.info(TOOL_DOCKER, "Docker image downloaded.");
+        return true;
     }
 
-    private void checkPullDockerImage(String imageName)
+    private boolean checkPullDockerImage(String imageName)
     throws AdlGenerationException
     {
         List<Image> images = docker.listImagesCmd().withImageNameFilter(imageName).exec();
         if (images.isEmpty())
-            pullDockerImage(imageName);
+            return pullDockerImage(imageName);
+        else
+            return true;
     }
 
     protected String containerName()
@@ -126,9 +181,9 @@ public class DockerAdlGenerator implements AdlGenerator
         return "adl";
     }
 
-    protected String imageName()
+    protected String imageName(String adlVersion)
     {
-        return "helixta/hxadl:0.31.1"; //TODO parameterize version
+        return "adl/adlc:" + adlVersion;
     }
 
     protected String getSourcePathInContainer()
@@ -149,6 +204,59 @@ public class DockerAdlGenerator implements AdlGenerator
     protected String getSearchDirectoryPathInContainer()
     {
         return "/data/searchdirs/";
+    }
+
+    private void buildDockerImage(String adlVersion)
+    throws AdlDistributionNotFoundException, IOException
+    {
+        log.info("Building Docker image for ADL " + adlVersion + "...");
+
+        AdlDistributionSpec specForDockerImage = new AdlDistributionSpec(adlVersion, MachineArchitecture.X86_64, OperatingSystemFamily.LINUX);
+        File adlDistributionArchive = adlDistributionService.resolveAdlDistributionArchive(specForDockerImage);
+
+        //Build a TAR file with the ADL distribution archive and a Dockerfile
+        try (ByteArrayOutputStream dOut = new ByteArrayOutputStream();
+             TarArchiveOutputStream tarOut = new TarArchiveOutputStream(dOut, StandardCharsets.UTF_8.name()))
+        {
+            //ADL distribution
+            TarArchiveEntry adlEntry = new TarArchiveEntry(adlDistributionArchive, "adl.zip");
+            tarOut.putArchiveEntry(adlEntry);
+            Files.copy(adlDistributionArchive.toPath(), tarOut);
+            tarOut.closeArchiveEntry();
+
+            //Dockerfile
+            byte[] dockerFileBytes =
+                ("FROM ubuntu:20.04\n" +
+                 "RUN apt-get update && apt-get -qqy install unzip\n" +
+                 "COPY /adl.zip /adl.zip\n" +
+                 "RUN mkdir -p /opt/adl && unzip -q /adl.zip -d /opt/adl && rm /adl.zip\n" +
+                 "RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*\n" +
+                 "CMD [\"/opt/adl/bin/adlc\"]"
+                ).getBytes(StandardCharsets.UTF_8);
+            TarArchiveEntry dockerfileEntry = new TarArchiveEntry("Dockerfile");
+            dockerfileEntry.setSize(dockerFileBytes.length);
+            tarOut.putArchiveEntry(dockerfileEntry);
+            tarOut.write(dockerFileBytes);
+            tarOut.closeArchiveEntry();
+
+            tarOut.close();
+
+            docker.buildImageCmd(new ByteArrayInputStream(dOut.toByteArray()))
+                  .withTags(ImmutableSet.of(imageName(adlVersion)))
+                  .exec(new BuildImageResultCallback()
+                  {
+                      @Override
+                      public void onNext(BuildResponseItem item)
+                      {
+                          super.onNext(item);
+                          if (item.getStream() != null)
+                          {
+                              adlLog.info(TOOL_DOCKER, item.getStream().trim());
+                          }
+                      }
+                  })
+                  .awaitImageId(); //TODO timeouts
+        }
     }
 
     private void runAdlc(AdlConfiguration adlConfiguration, GenerationConfiguration generation)
@@ -184,13 +292,13 @@ public class DockerAdlGenerator implements AdlGenerator
 
         //Put together the ADL command
         List<String> adlcCommand = new ArrayList<>();
-        adlcCommand.add("/opt/bin/adlc");
+        adlcCommand.add("/opt/adl/bin/adlc");
         adlcCommand.addAll(adlcCommandProcessor.createAdlcCommand(adlConfiguration, generation, dockerFileSystemMapper));
-        log.info("adlc command " + adlcCommand);
+        log.debug("adlc command " + adlcCommand);
 
         //Create Docker container that can execute ADL compiler
         String containerName = containerName();
-        CreateContainerResponse c = docker.createContainerCmd(imageName())
+        CreateContainerResponse c = docker.createContainerCmd(imageName(adlConfiguration.getVersion()))
                                           .withHostConfig(HostConfig.newHostConfig().withAutoRemove(false))
                                           .withName(containerName)
                                           .withCmd(adlcCommand)
@@ -296,8 +404,24 @@ public class DockerAdlGenerator implements AdlGenerator
     public void generate(AdlConfiguration configuration, Iterable<? extends GenerationConfiguration> generations)
     throws AdlGenerationException
     {
-        //Check if the image exists, if not then pull it
-        checkPullDockerImage(imageName());
+        //Check if the image exists, if not then try to pull it
+        boolean imageAvailable = checkPullDockerImage(imageName(configuration.getVersion()));
+        if (!imageAvailable)
+        {
+            log.info("ADL Docker image not found in repository so it will be built.");
+            try
+            {
+                buildDockerImage(configuration.getVersion());
+            }
+            catch (AdlDistributionNotFoundException e)
+            {
+                throw new AdlGenerationException("No Docker image or ADL distribution found for ADL version " + configuration.getVersion(), e);
+            }
+            catch (IOException e)
+            {
+                throw new AdlGenerationException(e.getMessage(), e);
+            }
+        }
 
         for (GenerationConfiguration generation : generations)
         {

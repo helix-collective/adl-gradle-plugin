@@ -110,7 +110,7 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         {
             case DOCKER:
                 //TODO configuration option to fallback to plain output
-                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, getObjectFactory());
+                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, adlDistributionService, getObjectFactory());
             case NATIVE:
                 return nativeAdlGenerator;
             default:

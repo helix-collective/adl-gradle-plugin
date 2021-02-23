@@ -94,9 +94,11 @@ public class AdlDistributionService
      *
      * @throws AdlDistributionNotFoundException if no distribution is available for the given spec.
      */
-    private File resolveAdlDistributionArchive(AdlDistributionSpec spec)
+    public File resolveAdlDistributionArchive(AdlDistributionSpec spec)
     throws AdlDistributionNotFoundException
     {
+        spec = normalizeSpec(spec);
+
         String classifier = specToClassifier(spec);
         if (classifier == null)
             throw new AdlDistributionNotFoundException("No ADL distribution available for OS: " + spec.getOs() + "/" + spec.getArchitecture());
@@ -159,8 +161,6 @@ public class AdlDistributionService
     public File adlDistribution(AdlDistributionSpec spec)
     throws AdlDistributionNotFoundException, IOException
     {
-        spec = normalizeSpec(spec);
-
         //Attempt to locate an already-unpacked local version
         File adlInstallationDir = new File(adlBaseInstallationDirectory, specToInstallationDirectoryName(spec));
         if (adlInstallationDir.exists())
