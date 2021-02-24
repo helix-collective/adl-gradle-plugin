@@ -30,6 +30,9 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.io.IOUtils;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
@@ -42,11 +45,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOError;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -219,18 +223,44 @@ public class DockerAdlGenerator implements AdlGenerator
              TarArchiveOutputStream tarOut = new TarArchiveOutputStream(dOut, StandardCharsets.UTF_8.name()))
         {
             //ADL distribution
-            TarArchiveEntry adlEntry = new TarArchiveEntry(adlDistributionArchive, "adl.zip");
-            tarOut.putArchiveEntry(adlEntry);
-            Files.copy(adlDistributionArchive.toPath(), tarOut);
-            tarOut.closeArchiveEntry();
+            //Unzip it on the host here which keeps the Docker build simple
+            //otherwise we'd have to apt-get install unzip which involves grabbing apt indexes, etc. which can take a long time for such a simple task
+            //Also note that we use ZipFile instead of ZipArchiveInputStream here intentionally
+            //- ZAIS does not read the central directory, so unix mode is not read properly
+            try (ZipFile adlZip = new ZipFile(adlDistributionArchive))
+            {
+                for (ZipArchiveEntry adlZipEntry : Collections.list(adlZip.getEntries()))
+                {
+                    //Entry name for files: adl/<file>
+                    //Entry name for dirs: adl/<dir>/
+                    String adlTarEntryName = adlZipEntry.getName();
+                    if (!adlTarEntryName.startsWith("/"))
+                        adlTarEntryName = "/" + adlTarEntryName;
+                    adlTarEntryName = "adl" + adlTarEntryName;
+                    if (adlZipEntry.isDirectory() && !adlZipEntry.getName().endsWith("/"))
+                        adlTarEntryName = adlTarEntryName + "/";
+
+                    TarArchiveEntry adlTarEntry = new TarArchiveEntry(adlTarEntryName);
+                    if (!adlTarEntry.isDirectory())
+                        adlTarEntry.setSize(adlZipEntry.getSize());
+                    if (adlZipEntry.getLastModifiedTime() != null)
+                        adlTarEntry.setModTime(adlZipEntry.getLastModifiedTime().toMillis());
+                    if (adlZipEntry.getUnixMode() != 0) //for executable flag
+                        adlTarEntry.setMode(adlZipEntry.getUnixMode());
+
+                    tarOut.putArchiveEntry(adlTarEntry);
+                    try (InputStream adlZipEntryIn = adlZip.getInputStream(adlZipEntry))
+                    {
+                        IOUtils.copy(adlZipEntryIn, tarOut);
+                    }
+                    tarOut.closeArchiveEntry();
+                }
+            }
 
             //Dockerfile
             byte[] dockerFileBytes =
                 ("FROM ubuntu:20.04\n" +
-                 "RUN apt-get update && apt-get -qqy install unzip\n" +
-                 "COPY /adl.zip /adl.zip\n" +
-                 "RUN mkdir -p /opt/adl && unzip -q /adl.zip -d /opt/adl && rm /adl.zip\n" +
-                 "RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*\n" +
+                 "COPY /adl/ /opt/adl/\n" +
                  "CMD [\"/opt/adl/bin/adlc\"]"
                 ).getBytes(StandardCharsets.UTF_8);
             TarArchiveEntry dockerfileEntry = new TarArchiveEntry("Dockerfile");
