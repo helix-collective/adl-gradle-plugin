@@ -77,3 +77,10 @@ tasks {
         dependsOn(test)
     }
 }
+
+//If adl.platform system property is configured, use it to configure platform of ADL tasks
+System.getProperty("adl.platform")?.let {
+    tasks.withType<au.com.helixta.adl.gradle.AdlGenerateTask> {
+        platform = au.com.helixta.adl.gradle.config.AdlPlatform.valueOf(it)
+    }
+}

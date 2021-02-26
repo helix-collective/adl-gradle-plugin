@@ -42,6 +42,38 @@ tasks {
     test {
         useJUnitPlatform()
     }
+
+    abstract class AdlPlatformTestGenerator(val adlPlatform: String) : org.ysb33r.gradle.gradletest.TestGenerator() {
+        override fun getOutputDir(): File {
+            return super.getOutputDir().resolveSibling("adl${adlPlatform}")
+        }
+
+        override fun getGradleArguments(): MutableList<String> {
+            return (super.getGradleArguments() + "-Dadl.platform=${adlPlatform.toUpperCase()}").toMutableList()
+        }
+    }
+
+    abstract class AdlNativeTestGenerator : AdlPlatformTestGenerator("native");
+    abstract class AdlDockerTestGenerator : AdlPlatformTestGenerator("docker");
+
+    //TODO conditional on native support on host platform
+
+    //Generate native and docker tests from the originals, explicitly configuring ADL with each platform
+    val nativeGradleTestGenerator = register<AdlNativeTestGenerator>("nativeGradleTestGenerator") {
+        linkedTestTaskName = gradleTestGenerator.get().linkedTestTaskName
+        testPackageName = "adlnative." + gradleTestGenerator.get().testPackageName
+    }
+
+    gradleTestGenerator {
+        dependsOn(nativeGradleTestGenerator)
+        doLast {
+            copy {
+                from(nativeGradleTestGenerator.get().outputDir)
+                into(outputDir.resolve("adlnative"))
+            }
+        }
+    }
+
     gradleTest {
         versions("6.8")
         dependsOn(jar)

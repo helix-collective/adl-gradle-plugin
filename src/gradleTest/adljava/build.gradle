@@ -77,3 +77,12 @@ task runGradleTest {
 processTestResources {
     from sourceSets.main.allSource
 }
+
+//If adl.platform system property is configured, use it to configure platform of ADL tasks
+def adlPlatformProperty = System.getProperty("adl.platform")
+if (adlPlatformProperty) {
+    tasks.withType(au.com.helixta.adl.gradle.AdlGenerateTask) {
+        platform = au.com.helixta.adl.gradle.config.AdlPlatform.valueOf(adlPlatformProperty)
+    }
+}
+
