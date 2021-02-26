@@ -34,6 +34,7 @@ tasks.test {
 }
 
 val adlJava = tasks.register<AdlGenerateTask>("adlJava") {
+    version = "0.14"
     source(file("$projectDir/src/main/adl"))
     isVerbose = true
     generations {

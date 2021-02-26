@@ -18,6 +18,7 @@ node {
 }
 
 val adlTypescript = tasks.register<AdlGenerateTask>("adlTypescript") {
+    version = "0.14"
     source(file("$projectDir/src/main/adl"))
     isVerbose = true
     generations {

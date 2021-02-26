@@ -48,6 +48,7 @@ test {
 }
 
 task adlJava(type: AdlGenerateTask) {
+    version = "0.14"
     source file("$projectDir/src/main/adl")
     generations {
         java {

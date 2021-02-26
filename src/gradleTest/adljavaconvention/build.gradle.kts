@@ -21,6 +21,7 @@ java {
 }
 
 adl {
+    version = "0.14"
     generations {
         java {
             javaPackage  = "adl.test"
