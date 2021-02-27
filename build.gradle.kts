@@ -56,29 +56,41 @@ tasks {
     abstract class AdlNativeTestGenerator : AdlPlatformTestGenerator("native");
     abstract class AdlDockerTestGenerator : AdlPlatformTestGenerator("docker");
 
-    //TODO conditional on native support on host platform
-    //val performNativeAdlPlatformTests = org.gradle.internal.os.OperatingSystem.current()...
-
     //Generate native and docker tests from the originals, explicitly configuring ADL with each platform
-    val nativeGradleTestGenerator = register<AdlNativeTestGenerator>("nativeGradleTestGenerator") {
-        linkedTestTaskName = gradleTestGenerator.get().linkedTestTaskName
-        testPackageName = "adlnative." + gradleTestGenerator.get().testPackageName
-    }
     val dockerGradleTestGenerator = register<AdlDockerTestGenerator>("dockerGradleTestGenerator") {
         linkedTestTaskName = gradleTestGenerator.get().linkedTestTaskName
         testPackageName = "adldocker." + gradleTestGenerator.get().testPackageName
     }
-
     gradleTestGenerator {
-        dependsOn(nativeGradleTestGenerator, dockerGradleTestGenerator)
+        dependsOn(dockerGradleTestGenerator)
         doLast {
-            copy {
-                from(nativeGradleTestGenerator.get().outputDir)
-                into("$outputDir/adlnative")
-            }
             copy {
                 from(dockerGradleTestGenerator.get().outputDir)
                 into("$outputDir/adldocker")
+            }
+        }
+    }
+
+    //Native ADL platform is only available on Mac and Linux, so don't try to run these on other platforms
+    val performNativePlatformTests = with(org.gradle.internal.os.OperatingSystem.current()) { isLinux || isMacOsX }
+    if (performNativePlatformTests) {
+        val nativeGradleTestGenerator = register<AdlNativeTestGenerator>("nativeGradleTestGenerator") {
+            linkedTestTaskName = gradleTestGenerator.get().linkedTestTaskName
+            testPackageName = "adlnative." + gradleTestGenerator.get().testPackageName
+        }
+        gradleTestGenerator {
+            dependsOn(nativeGradleTestGenerator)
+            doLast {
+                copy {
+                    from(nativeGradleTestGenerator.get().outputDir)
+                    into("$outputDir/adlnative")
+                }
+            }
+        }
+    } else {
+        gradleTestGenerator {
+            doFirst {
+                logger.warn("This OS/platform does not support native ADL execution, so cannot run the ADL native integration tests")
             }
         }
     }
