@@ -23,6 +23,7 @@ import org.gradle.api.tasks.TaskAction;
 import org.gradle.initialization.GradleUserHomeDirProvider;
 import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
+import org.gradle.nativeplatform.TargetMachineFactory;
 import org.gradle.process.ExecOperations;
 
 import javax.inject.Inject;
@@ -48,6 +49,9 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
 
     @Inject
     protected abstract ExecOperations getExecOperations();
+
+    @Inject
+    protected abstract TargetMachineFactory getTargetMachineFactory();
 
     private GenerationsConfiguration generations = getObjectFactory().newInstance(GenerationsConfiguration.class);
     private DockerConfiguration docker = getObjectFactory().newInstance(DockerConfiguration.class);
@@ -110,7 +114,7 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         {
             case DOCKER:
                 //TODO configuration option to fallback to plain output
-                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, adlDistributionService, getObjectFactory());
+                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, adlDistributionService, getTargetMachineFactory(), getObjectFactory());
             case NATIVE:
                 return nativeAdlGenerator;
             default:

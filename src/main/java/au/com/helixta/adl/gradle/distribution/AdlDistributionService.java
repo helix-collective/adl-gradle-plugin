@@ -8,6 +8,7 @@ import org.gradle.api.artifacts.repositories.IvyArtifactRepository;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileSystemOperations;
 import org.gradle.initialization.GradleUserHomeDirProvider;
+import org.gradle.nativeplatform.platform.internal.Architectures;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -15,7 +16,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.Set;
 
 public class AdlDistributionService
@@ -38,40 +38,17 @@ public class AdlDistributionService
     }
 
     /**
-     * Normalizes an ADL distribution specification, normalizing architecture and OS names.
-     * OS names and architectures for certain platforms can have many different names which we don't want to deal with everywhere.
-     *
-     * @param spec the spec to normalize.
-     *
-     * @return the normalized spec.
-     */
-    private AdlDistributionSpec normalizeSpec(AdlDistributionSpec spec)
-    {
-        String arch = spec.getArchitecture();
-        if ("x86_64".equals(spec.getArchitecture()) || "x86-64".equals(spec.getArchitecture()))
-            arch = "amd64";
-
-        String os = spec.getOs().toLowerCase(Locale.ROOT);
-        if (os.contains("mac os x") || os.contains("darwin") || os.contains("osx"))
-            os = "osx";
-        else if (os.contains("linux"))
-            os = "linux";
-
-        return new AdlDistributionSpec(spec.getVersion(), arch, os);
-    }
-
-    /**
      * For a given spec, make an archive classifier for downloading off of the ADL Github releases page.
      */
     private String specToClassifier(AdlDistributionSpec spec)
     {
         //Only 64-bit releases are available for ADL
-        if (!"amd64".equals(spec.getArchitecture()))
+        if (!Architectures.X86_64.isAlias(spec.getArchitecture().getName()))
             return null;
 
         //Only OSX/linux supported
-        if ("osx".equals(spec.getOs()) || "linux".equals(spec.getOs()))
-            return spec.getOs();
+        if (spec.getOs().isMacOsX() || spec.getOs().isLinux())
+            return spec.getOs().getName();
 
         //No other OSes supported
         return null;
@@ -82,7 +59,7 @@ public class AdlDistributionService
      */
     private String specToInstallationDirectoryName(AdlDistributionSpec spec)
     {
-        return "adl-" + spec.getVersion() + "-" + spec.getOs() + "-" + spec.getArchitecture();
+        return "adl-" + spec.getVersion() + "-" + spec.getOs().getName() + "-" + spec.getArchitecture().getName();
     }
 
     /**
@@ -97,8 +74,6 @@ public class AdlDistributionService
     public File resolveAdlDistributionArchive(AdlDistributionSpec spec)
     throws AdlDistributionNotFoundException
     {
-        spec = normalizeSpec(spec);
-
         String classifier = specToClassifier(spec);
         if (classifier == null)
             throw new AdlDistributionNotFoundException("No ADL distribution available for OS: " + spec.getOs() + "/" + spec.getArchitecture());

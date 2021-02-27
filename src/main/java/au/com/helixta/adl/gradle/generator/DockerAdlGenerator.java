@@ -36,8 +36,10 @@ import org.apache.commons.io.IOUtils;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
-import org.gradle.nativeplatform.MachineArchitecture;
-import org.gradle.nativeplatform.OperatingSystemFamily;
+import org.gradle.nativeplatform.TargetMachine;
+import org.gradle.nativeplatform.TargetMachineFactory;
+import org.gradle.nativeplatform.platform.internal.DefaultArchitecture;
+import org.gradle.nativeplatform.platform.internal.DefaultOperatingSystem;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -67,21 +69,24 @@ public class DockerAdlGenerator implements AdlGenerator
     private final AdlToolLogger adlLog;
     private final AdlDistributionService adlDistributionService;
     private final DockerClient docker;
+    private final TargetMachineFactory targetMachineFactory;
     private final ObjectFactory objectFactory;
 
     private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
 
-    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, AdlDistributionService adlDistributionService, ObjectFactory objectFactory)
+    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, AdlDistributionService adlDistributionService, TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory)
     {
         this.docker = Objects.requireNonNull(docker);
         this.adlLog = Objects.requireNonNull(adlLog);
         this.adlDistributionService = Objects.requireNonNull(adlDistributionService);
+        this.targetMachineFactory = Objects.requireNonNull(targetMachineFactory);
         this.objectFactory = Objects.requireNonNull(objectFactory);
     }
 
     public static DockerAdlGenerator fromConfiguration(DockerConfiguration dockerConfiguration,
                                                        AdlToolLogger adlLog,
                                                        AdlDistributionService adlDistributionService,
+                                                       TargetMachineFactory targetMachineFactory,
                                                        ObjectFactory objectFactory)
     {
         DockerClientConfig config = dockerClientConfig(dockerConfiguration);
@@ -91,7 +96,7 @@ public class DockerAdlGenerator implements AdlGenerator
                                             .build();
 
          DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
-         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, objectFactory);
+         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory);
     }
 
     private static DockerClientConfig dockerClientConfig(DockerConfiguration config)
@@ -215,7 +220,9 @@ public class DockerAdlGenerator implements AdlGenerator
     {
         log.info("Building Docker image for ADL " + adlVersion + "...");
 
-        AdlDistributionSpec specForDockerImage = new AdlDistributionSpec(adlVersion, MachineArchitecture.X86_64, OperatingSystemFamily.LINUX);
+        TargetMachine linuxMachine = targetMachineFactory.getLinux().getX86_64();
+        AdlDistributionSpec specForDockerImage = new AdlDistributionSpec(adlVersion, new DefaultArchitecture(linuxMachine.getArchitecture().getName()),
+                                                                                                             new DefaultOperatingSystem(linuxMachine.getOperatingSystemFamily().getName()));
         File adlDistributionArchive = adlDistributionService.resolveAdlDistributionArchive(specForDockerImage);
 
         //Build a TAR file with the ADL distribution archive and a Dockerfile

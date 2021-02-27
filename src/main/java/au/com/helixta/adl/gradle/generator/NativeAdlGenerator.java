@@ -6,7 +6,7 @@ import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
 import org.gradle.api.GradleException;
-import org.gradle.nativeplatform.platform.OperatingSystem;
+import org.gradle.nativeplatform.platform.NativePlatform;
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform;
 import org.gradle.process.ExecOperations;
 
@@ -37,11 +37,10 @@ public class NativeAdlGenerator implements AdlGenerator
 
     protected AdlDistributionSpec adlDistributionSpecForConfiguration(AdlConfiguration configuration)
     {
-        OperatingSystem os = org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem();
-        String arch = DefaultNativePlatform.getCurrentArchitecture().getName();
-
-        //os.getName() matches what the ADL distribution binaries have
-        return new AdlDistributionSpec(configuration.getVersion(), arch, os.getName());
+        NativePlatform host = DefaultNativePlatform.host();
+        return new AdlDistributionSpec(configuration.getVersion(),
+                                       host.getArchitecture(),
+                                       host.getOperatingSystem());
     }
 
     /**
