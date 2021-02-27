@@ -52,7 +52,7 @@ public class AdlDistributionService
 
         //Only OSX/linux supported        
         if (spec.getOs().isMacOsX() || spec.getOs().isLinux())
-            return spec.getOs().getName();
+            return osFamilyName(spec.getOs());
 
         //No other OSes supported
         return null;
