@@ -57,19 +57,28 @@ tasks {
     abstract class AdlDockerTestGenerator : AdlPlatformTestGenerator("docker");
 
     //TODO conditional on native support on host platform
+    //val performNativeAdlPlatformTests = org.gradle.internal.os.OperatingSystem.current()...
 
     //Generate native and docker tests from the originals, explicitly configuring ADL with each platform
     val nativeGradleTestGenerator = register<AdlNativeTestGenerator>("nativeGradleTestGenerator") {
         linkedTestTaskName = gradleTestGenerator.get().linkedTestTaskName
         testPackageName = "adlnative." + gradleTestGenerator.get().testPackageName
     }
+    val dockerGradleTestGenerator = register<AdlDockerTestGenerator>("dockerGradleTestGenerator") {
+        linkedTestTaskName = gradleTestGenerator.get().linkedTestTaskName
+        testPackageName = "adldocker." + gradleTestGenerator.get().testPackageName
+    }
 
     gradleTestGenerator {
-        dependsOn(nativeGradleTestGenerator)
+        dependsOn(nativeGradleTestGenerator, dockerGradleTestGenerator)
         doLast {
             copy {
                 from(nativeGradleTestGenerator.get().outputDir)
-                into(outputDir.resolve("adlnative"))
+                into("$outputDir/adlnative")
+            }
+            copy {
+                from(dockerGradleTestGenerator.get().outputDir)
+                into("$outputDir/adldocker")
             }
         }
     }
@@ -78,6 +87,12 @@ tasks {
         versions("6.8")
         dependsOn(jar)
         kotlinDsl = true
+
+        //Only include the two derived generators' files, not the originals
+        //originals would execute in adl platform=auto mode but since
+        //we are hitting both docker/native modes already that would just be
+        //duplicate effort for no gain
+        include("adlnative/**", "adldocker/**")
 
         //Print names of tests before they run
         beforeTest(closureOf<TestDescriptor>{
