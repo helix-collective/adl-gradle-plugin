@@ -8,7 +8,10 @@ import org.gradle.api.artifacts.repositories.IvyArtifactRepository;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileSystemOperations;
 import org.gradle.initialization.GradleUserHomeDirProvider;
+import org.gradle.nativeplatform.OperatingSystemFamily;
+import org.gradle.nativeplatform.platform.OperatingSystem;
 import org.gradle.nativeplatform.platform.internal.Architectures;
+import org.gradle.nativeplatform.platform.internal.OperatingSystemInternal;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -16,6 +19,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Set;
 
 public class AdlDistributionService
@@ -46,7 +50,7 @@ public class AdlDistributionService
         if (!Architectures.X86_64.isAlias(spec.getArchitecture().getName()))
             return null;
 
-        //Only OSX/linux supported
+        //Only OSX/linux supported        
         if (spec.getOs().isMacOsX() || spec.getOs().isLinux())
             return spec.getOs().getName();
 
@@ -54,12 +58,26 @@ public class AdlDistributionService
         return null;
     }
 
+    private static String osFamilyName(OperatingSystem os)
+    {
+        if (os instanceof OperatingSystemInternal)
+            return ((OperatingSystemInternal)os).toFamilyName();
+        else if (os.isWindows())
+            return OperatingSystemFamily.WINDOWS;
+        else if (os.isLinux())
+            return OperatingSystemFamily.LINUX;
+        else if (os.isMacOsX())
+            return OperatingSystemFamily.MACOS;
+        else
+            return os.getName();
+    }
+
     /**
      * For a given spec, returns the name of the ADL installation directory.
      */
     private String specToInstallationDirectoryName(AdlDistributionSpec spec)
     {
-        return "adl-" + spec.getVersion() + "-" + spec.getOs().getName() + "-" + spec.getArchitecture().getName();
+        return "adl-" + spec.getVersion() + "-" + osFamilyName(spec.getOs()) + "-" + spec.getArchitecture().getName().toLowerCase(Locale.ROOT);
     }
 
     /**
