@@ -59,7 +59,7 @@ public class AdlcCommandLineGenerator
 
         command.add("--outputdir=" + fileSystemMapper.targetDirectory(generation.getOutputDirectory().get()));
 
-        for (File searchDir : adlConfiguration.getSearchDirectories().get())
+        for (File searchDir : adlConfiguration.getSearchDirectories())
         {
             command.add("--searchdir=" + fileSystemMapper.targetDirectory(searchDir));
         }
@@ -115,7 +115,7 @@ public class AdlcCommandLineGenerator
 
         command.add("--outputdir=" + fileSystemMapper.targetDirectory(generation.getOutputDirectory().get()));
 
-        for (File searchDir : adlConfiguration.getSearchDirectories().get())
+        for (File searchDir : adlConfiguration.getSearchDirectories())
         {
             command.add("--searchdir=" + fileSystemMapper.targetDirectory(searchDir));
         }

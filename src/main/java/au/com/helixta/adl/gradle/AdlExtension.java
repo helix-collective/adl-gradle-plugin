@@ -4,8 +4,8 @@ import au.com.helixta.adl.gradle.config.AdlPlatform;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
 import org.gradle.api.Action;
+import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileCollection;
-import org.gradle.api.provider.ListProperty;
 import org.gradle.api.tasks.Console;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
@@ -40,27 +40,16 @@ public interface AdlExtension
 
     @InputFiles
     @Optional
-    public ListProperty<File> getSearchDirectories();
+    public ConfigurableFileCollection getSearchDirectories();
 
     public default void searchDirectory(File... dirs)
     {
-        getSearchDirectories().addAll(Arrays.asList(dirs));
+        getSearchDirectories().from((Object[])dirs);
     }
 
     public default void searchDirectory(FileCollection... dirs)
     {
-        for (FileCollection dir : dirs)
-        {
-            //For collections, pull out top-level dir and use that
-            dir.getAsFileTree().visit(d ->
-                                      {
-                                          if (d.isDirectory())
-                                          {
-                                              getSearchDirectories().add(d.getFile());
-                                              d.stopVisiting();
-                                          }
-                                      });
-        }
+        getSearchDirectories().from((Object[])dirs);
     }
 
     /**
@@ -89,7 +78,7 @@ public interface AdlExtension
         setVerbose(other.isVerbose());
         setVersion(other.getVersion());
         setPlatform(other.getPlatform());
-        getSearchDirectories().addAll(other.getSearchDirectories());
+        getSearchDirectories().from(other.getSearchDirectories());
         getGenerations().copyFrom(other.getGenerations());
         getDocker().copyFrom(other.getDocker());
         return this;

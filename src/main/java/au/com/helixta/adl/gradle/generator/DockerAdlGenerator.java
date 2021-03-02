@@ -307,7 +307,7 @@ public class DockerAdlGenerator implements AdlGenerator
 
         //and searchdirs
         int searchDirIndex = 0;
-        for (File searchDirectory : adlConfiguration.getSearchDirectories().get())
+        for (File searchDirectory : adlConfiguration.getSearchDirectories())
         {
             String searchDirContainerPath = getSearchDirectoryPathInContainer() + searchDirIndex + "/";
             dockerFileSystemMapper.addInputFiles(searchDirectory, searchDirContainerPath);
@@ -331,7 +331,7 @@ public class DockerAdlGenerator implements AdlGenerator
         List<String> adlcCommand = new ArrayList<>();
         adlcCommand.add("/opt/adl/bin/adlc");
         adlcCommand.addAll(adlcCommandProcessor.createAdlcCommand(adlConfiguration, generation, dockerFileSystemMapper));
-        log.debug("adlc command " + adlcCommand);
+        log.info("adlc command " + adlcCommand);
 
         //Create Docker container that can execute ADL compiler
         String containerName = containerName();
