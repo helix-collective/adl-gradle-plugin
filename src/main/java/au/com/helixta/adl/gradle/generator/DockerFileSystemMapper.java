@@ -6,7 +6,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.gradle.api.file.ConfigurableFileTree;
+import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.Directory;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.file.RegularFile;
@@ -50,6 +50,7 @@ public class DockerFileSystemMapper implements FileSystemMapper
 {
     private final ObjectFactory objectFactory;
     private final DockerClient docker;
+    private final ArchiveProcessor archiveProcessor;
 
     private final Map<FileTreeLabel, SourceTarArchive> inputFileTreeMap = new HashMap<>();
     private final Map<File, SourceTarArchive> inputFileMap = new HashMap<>();
@@ -57,10 +58,11 @@ public class DockerFileSystemMapper implements FileSystemMapper
     private final Map<File, String> outputDirectoryMap = new HashMap<>();
     private final Map<File, String> outputFileMap = new HashMap<>();
 
-    public DockerFileSystemMapper(ObjectFactory objectFactory, DockerClient docker)
+    public DockerFileSystemMapper(ObjectFactory objectFactory, ArchiveOperations archiveOperations, DockerClient docker)
     {
         this.objectFactory = Objects.requireNonNull(objectFactory);
         this.docker = Objects.requireNonNull(docker);
+        this.archiveProcessor = new ArchiveProcessor(archiveOperations);
     }
 
     /**
@@ -88,9 +90,19 @@ public class DockerFileSystemMapper implements FileSystemMapper
     public void addInputFiles(File directory, String basePathInContainer)
     throws AdlGenerationException
     {
-        ConfigurableFileTree dirTree = objectFactory.fileTree().from(directory);
-        SourceTarArchive dirTar = createTarFromFileTree(dirTree, basePathInContainer);
-        inputFileMap.put(directory, dirTar);
+        try
+        {
+            FileTree dirTree = archiveProcessor.archiveToFileTree(directory);
+            if (dirTree == null)
+                dirTree = objectFactory.fileTree().from(directory);
+
+            SourceTarArchive dirTar = createTarFromFileTree(dirTree, basePathInContainer);
+            inputFileMap.put(directory, dirTar);
+        }
+        catch (IOException e)
+        {
+            throw new AdlGenerationException("Error scanning file: " + directory, e);
+        }
     }
 
     /**
@@ -180,7 +192,20 @@ public class DockerFileSystemMapper implements FileSystemMapper
     }
 
     @Override
-    public String targetDirectory(File directory)
+    public String targetInputDirectory(File directory)
+    throws AdlGenerationException
+    {
+        return targetDirectory(directory);
+    }
+
+    @Override
+    public String targetOutputDirectory(File directory)
+    throws AdlGenerationException
+    {
+        return targetDirectory(directory);
+    }
+
+    private String targetDirectory(File directory)
     throws AdlGenerationException
     {
         SourceTarArchive mappedTar = inputFileMap.get(directory);

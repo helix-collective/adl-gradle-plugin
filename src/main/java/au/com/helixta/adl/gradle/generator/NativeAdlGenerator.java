@@ -6,6 +6,7 @@ import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
 import org.gradle.api.GradleException;
+import org.gradle.api.file.ArchiveOperations;
 import org.gradle.nativeplatform.platform.NativePlatform;
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform;
 import org.gradle.process.ExecOperations;
@@ -26,13 +27,14 @@ public class NativeAdlGenerator implements AdlGenerator
     private final ExecOperations execOperations;
     private final AdlDistributionService adlDistributionService;
     private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
-    private final FileSystemMapper fileSystemMapper = new LocalFileSystemMapper();
+    private final FileSystemMapper fileSystemMapper;
 
-    public NativeAdlGenerator(ExecOperations execOperations, AdlDistributionService adlDistributionService, AdlToolLogger adlLog)
+    public NativeAdlGenerator(ExecOperations execOperations, ArchiveOperations archiveOperations, AdlDistributionService adlDistributionService, AdlToolLogger adlLog)
     {
         this.execOperations = Objects.requireNonNull(execOperations);
         this.adlDistributionService = Objects.requireNonNull(adlDistributionService);
         this.adlLog = Objects.requireNonNull(adlLog);
+        this.fileSystemMapper = new ArchiveExpandingLocalFileSystemMapper(archiveOperations);
     }
 
     protected AdlDistributionSpec adlDistributionSpecForConfiguration(AdlConfiguration configuration)

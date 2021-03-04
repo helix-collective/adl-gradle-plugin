@@ -57,11 +57,13 @@ public class AdlcCommandLineGenerator
         List<String> command = new ArrayList<>();
         command.add("java");
 
-        command.add("--outputdir=" + fileSystemMapper.targetDirectory(generation.getOutputDirectory().get()));
+        command.add("--outputdir=" + fileSystemMapper.targetOutputDirectory(generation.getOutputDirectory().get()));
 
         for (File searchDir : adlConfiguration.getSearchDirectories())
         {
-            command.add("--searchdir=" + fileSystemMapper.targetDirectory(searchDir));
+            String targetSearchDir = fileSystemMapper.targetInputDirectory(searchDir);
+            if (targetSearchDir != null)
+                command.add("--searchdir=" + fileSystemMapper.targetInputDirectory(searchDir));
         }
 
         if (generation.getJavaPackage() != null && !generation.getJavaPackage().trim().isEmpty())
@@ -113,11 +115,13 @@ public class AdlcCommandLineGenerator
         List<String> command = new ArrayList<>();
         command.add("typescript");
 
-        command.add("--outputdir=" + fileSystemMapper.targetDirectory(generation.getOutputDirectory().get()));
+        command.add("--outputdir=" + fileSystemMapper.targetOutputDirectory(generation.getOutputDirectory().get()));
 
         for (File searchDir : adlConfiguration.getSearchDirectories())
         {
-            command.add("--searchdir=" + fileSystemMapper.targetDirectory(searchDir));
+            String targetSearchDir = fileSystemMapper.targetInputDirectory(searchDir);
+            if (targetSearchDir != null)
+                command.add("--searchdir=" + fileSystemMapper.targetInputDirectory(searchDir));
         }
 
         if (adlConfiguration.isVerbose())

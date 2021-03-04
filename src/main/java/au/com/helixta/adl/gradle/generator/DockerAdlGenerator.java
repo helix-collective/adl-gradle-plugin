@@ -33,6 +33,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.io.IOUtils;
+import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
@@ -71,23 +72,28 @@ public class DockerAdlGenerator implements AdlGenerator
     private final DockerClient docker;
     private final TargetMachineFactory targetMachineFactory;
     private final ObjectFactory objectFactory;
+    private final ArchiveOperations archiveOperations;
 
     private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
 
-    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, AdlDistributionService adlDistributionService, TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory)
+    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, AdlDistributionService adlDistributionService,
+                              TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory,
+                              ArchiveOperations archiveOperations)
     {
         this.docker = Objects.requireNonNull(docker);
         this.adlLog = Objects.requireNonNull(adlLog);
         this.adlDistributionService = Objects.requireNonNull(adlDistributionService);
         this.targetMachineFactory = Objects.requireNonNull(targetMachineFactory);
         this.objectFactory = Objects.requireNonNull(objectFactory);
+        this.archiveOperations = Objects.requireNonNull(archiveOperations);
     }
 
     public static DockerAdlGenerator fromConfiguration(DockerConfiguration dockerConfiguration,
                                                        AdlToolLogger adlLog,
                                                        AdlDistributionService adlDistributionService,
                                                        TargetMachineFactory targetMachineFactory,
-                                                       ObjectFactory objectFactory)
+                                                       ObjectFactory objectFactory,
+                                                       ArchiveOperations archiveOperations)
     {
         DockerClientConfig config = dockerClientConfig(dockerConfiguration);
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
@@ -96,7 +102,7 @@ public class DockerAdlGenerator implements AdlGenerator
                                             .build();
 
          DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
-         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory);
+         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
     }
 
     private static DockerClientConfig dockerClientConfig(DockerConfiguration config)
@@ -299,7 +305,7 @@ public class DockerAdlGenerator implements AdlGenerator
     private void runAdlc(AdlConfiguration adlConfiguration, GenerationConfiguration generation)
     throws AdlGenerationException
     {
-        DockerFileSystemMapper dockerFileSystemMapper = new DockerFileSystemMapper(objectFactory, docker);
+        DockerFileSystemMapper dockerFileSystemMapper = new DockerFileSystemMapper(objectFactory, archiveOperations, docker);
 
         //Generate archive for source files
         dockerFileSystemMapper.addInputFiles(new FileSystemMapper.LabelledFileTree(AdlFileTreeLabel.SOURCES, adlConfiguration.getSource()),

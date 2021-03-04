@@ -9,11 +9,19 @@ import java.util.stream.Collectors;
 public class LocalFileSystemMapper implements FileSystemMapper
 {
     @Override
-    public String targetDirectory(File directory)
+    public String targetInputDirectory(File directory)
     throws AdlGenerationException
     {
         return directory.getAbsolutePath() + File.separator;
     }
+
+    @Override
+    public String targetOutputDirectory(File directory)
+    throws AdlGenerationException
+    {
+        return directory.getAbsolutePath() + File.separator;
+    }
+
 
     @Override
     public String targetFile(RegularFile file)

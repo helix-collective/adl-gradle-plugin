@@ -13,22 +13,22 @@ import java.util.List;
 public interface FileSystemMapper
 {
     /**
-     * Given a local directory, returns the corresponding path in the target filesystem.
+     * Given a local input directory, returns the corresponding path in the target filesystem.
      *
      * @param directory a local directory.
      *
-     * @return path in the target filesystem.
+     * @return path in the target filesystem.  May return null if the input directory should be ignored.
      *
      * @throws AdlGenerationException if an error occurs.
      */
-    public default String targetDirectory(Directory directory)
+    public default String targetInputDirectory(Directory directory)
     throws AdlGenerationException
     {
-        return targetDirectory(directory.getAsFile());
+        return targetInputDirectory(directory.getAsFile());
     }
 
     /**
-     * Given a local directory, returns the corresponding path in the target filesystem.
+     * Given a local output directory, returns the corresponding path in the target filesystem.
      *
      * @param directory a local directory.
      *
@@ -36,7 +36,34 @@ public interface FileSystemMapper
      *
      * @throws AdlGenerationException if an error occurs.
      */
-    public String targetDirectory(File directory)
+    public default String targetOutputDirectory(Directory directory)
+    throws AdlGenerationException
+    {
+        return targetOutputDirectory(directory.getAsFile());
+    }
+
+    /**
+     * Given a local input directory, returns the corresponding path in the target filesystem.
+     *
+     * @param directory a local directory.
+     *
+     * @return path in the target filesystem.  May return null if the input directory should be ignored.
+     *
+     * @throws AdlGenerationException if an error occurs.
+     */
+    public String targetInputDirectory(File directory)
+    throws AdlGenerationException;
+
+    /**
+     * Given a local output directory, returns the corresponding path in the target filesystem.
+     *
+     * @param directory a local directory.
+     *
+     * @return path in the target filesystem.
+     *
+     * @throws AdlGenerationException if an error occurs.
+     */
+    public String targetOutputDirectory(File directory)
     throws AdlGenerationException;
 
     /**

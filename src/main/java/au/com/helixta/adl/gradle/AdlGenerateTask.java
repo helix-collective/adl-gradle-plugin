@@ -87,7 +87,7 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         ColoredAdlToolLogger adlLogger = new ColoredAdlToolLogger(out, err, getProject().getLogger().isEnabled(LogLevel.INFO));
 
         AdlDistributionService adlDistributionService = new AdlDistributionService(getGradleUserHomeDirProvider(), getFileSystemOperations(), getArchiveOperations(), getProject());
-        NativeAdlGenerator nativeAdlGenerator = new NativeAdlGenerator(getExecOperations(), adlDistributionService, adlLogger);
+        NativeAdlGenerator nativeAdlGenerator = new NativeAdlGenerator(getExecOperations(), getArchiveOperations(), adlDistributionService, adlLogger);
 
         AdlPlatform platform = getPlatform();
         if (platform == null)
@@ -114,7 +114,7 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         {
             case DOCKER:
                 //TODO configuration option to fallback to plain output
-                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, adlDistributionService, getTargetMachineFactory(), getObjectFactory());
+                return DockerAdlGenerator.fromConfiguration(getDocker(), adlLogger, adlDistributionService, getTargetMachineFactory(), getObjectFactory(), getArchiveOperations());
             case NATIVE:
                 return nativeAdlGenerator;
             default:
