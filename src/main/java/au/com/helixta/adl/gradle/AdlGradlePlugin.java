@@ -4,6 +4,7 @@ import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.file.Directory;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.SourceDirectorySet;
@@ -13,6 +14,8 @@ import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.provider.Provider;
 
 import javax.inject.Inject;
+import java.io.File;
+import java.util.Set;
 
 import static org.gradle.api.internal.lambdas.SerializableLambdas.spec;
 
@@ -32,6 +35,12 @@ public class AdlGradlePlugin implements Plugin<Project>
         project.getPluginManager().apply(JavaBasePlugin.class);
 
         AdlExtension extension = project.getExtensions().create("adl", AdlExtension.class);
+
+        //TODO probably need some specific versions of these configurations
+        Configuration adlSearchDirectoriesConfig = project.getConfigurations().create("adlSearchDirectories", c -> {
+            c.setCanBeResolved(true);
+            c.setCanBeConsumed(false);
+        });
 
         //For every source set, add an 'adl' source directory
         //e.g. src/main -> src/main/adl
@@ -56,6 +65,14 @@ public class AdlGradlePlugin implements Plugin<Project>
             {
                 adlTask.copyFrom(extension);
                 adlTask.source(adlSourceFiles);
+
+                Set<File> resolvedAdlSearchDirectories = adlSearchDirectoriesConfig.resolve();
+
+                for (File resolvedAdlSearchDirectory : resolvedAdlSearchDirectories)
+                {
+                    //TODO do something with the resolved ADL search directory
+                    System.out.println("Resolved ADL search directory: " + resolvedAdlSearchDirectory);
+                }
 
                 //Auto-configure the output directories if not explicitly defined
                 for (GenerationConfiguration generation : adlTask.getGenerations().allGenerations())
