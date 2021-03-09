@@ -1,0 +1,11 @@
+module sub {
+
+import animal.AnimalName;
+
+/// Puss, puss, puss
+struct Cat {
+    AnimalName name;
+    Int32 age;
+};
+
+};

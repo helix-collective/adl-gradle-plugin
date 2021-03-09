@@ -14,8 +14,6 @@ import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.provider.Provider;
 
 import javax.inject.Inject;
-import java.io.File;
-import java.util.Set;
 
 import static org.gradle.api.internal.lambdas.SerializableLambdas.spec;
 
@@ -36,11 +34,15 @@ public class AdlGradlePlugin implements Plugin<Project>
 
         AdlExtension extension = project.getExtensions().create("adl", AdlExtension.class);
 
-        //TODO probably need some specific versions of these configurations
+        //Add configurations for search directories
         Configuration adlSearchDirectoriesConfig = project.getConfigurations().create("adlSearchDirectories", c -> {
             c.setCanBeResolved(true);
             c.setCanBeConsumed(false);
         });
+        Configuration testAdlSearchDirectoriesConfig = project.getConfigurations().create("testAdlSearchDirectories", c -> {
+            c.setCanBeResolved(true);
+            c.setCanBeConsumed(false);
+        }).extendsFrom(adlSearchDirectoriesConfig);
 
         //For every source set, add an 'adl' source directory
         //e.g. src/main -> src/main/adl
@@ -66,13 +68,12 @@ public class AdlGradlePlugin implements Plugin<Project>
                 adlTask.copyFrom(extension);
                 adlTask.source(adlSourceFiles);
 
-                Set<File> resolvedAdlSearchDirectories = adlSearchDirectoriesConfig.resolve();
-
-                for (File resolvedAdlSearchDirectory : resolvedAdlSearchDirectories)
-                {
-                    //TODO do something with the resolved ADL search directory
-                    System.out.println("Resolved ADL search directory: " + resolvedAdlSearchDirectory);
-                }
+                //Special case configure test generate task with test search directories config,
+                //all others just get the standard search directories
+                if ("generateTestAdl".equals(adlTask.getName()))
+                    adlTask.searchDirectory(testAdlSearchDirectoriesConfig);
+                else
+                    adlTask.searchDirectory(adlSearchDirectoriesConfig);
 
                 //Auto-configure the output directories if not explicitly defined
                 for (GenerationConfiguration generation : adlTask.getGenerations().allGenerations())
