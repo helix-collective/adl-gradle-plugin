@@ -108,7 +108,7 @@ tasks {
 
         //Print names of tests before they run
         beforeTest(closureOf<TestDescriptor>{
-            logger.lifecycle("\t${this.name}")
+            logger.lifecycle("\t${this.className?.substringBefore(".")} : ${this.name}")
         })
     }
 
