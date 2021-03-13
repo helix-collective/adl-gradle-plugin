@@ -1,0 +1,11 @@
+module test {
+
+import sub.cat.Cat;
+
+struct Vet {
+    String name;
+    String clinicLocation;
+    Vector<Cat> patients;
+};
+
+};

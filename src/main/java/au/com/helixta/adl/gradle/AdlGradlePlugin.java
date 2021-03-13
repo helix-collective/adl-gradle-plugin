@@ -70,10 +70,27 @@ public class AdlGradlePlugin implements Plugin<Project>
 
                 //Special case configure test generate task with test search directories config,
                 //all others just get the standard search directories
+                Configuration searchDirectoryConfigForTask;
                 if ("generateTestAdl".equals(adlTask.getName()))
-                    adlTask.searchDirectory(testAdlSearchDirectoriesConfig);
+                    searchDirectoryConfigForTask = testAdlSearchDirectoriesConfig;
                 else
-                    adlTask.searchDirectory(adlSearchDirectoriesConfig);
+                    searchDirectoryConfigForTask = adlSearchDirectoriesConfig;
+
+                adlTask.searchDirectory(searchDirectoryConfigForTask);
+
+                //Slight mis-use getTaskName() to get a decent configuration name for sources
+                //e.g. adlSourcesElements, adlSourcesTestElements
+                String adlSourcesConfigurationName = sourceSet.getTaskName("adlSources", "Elements");
+                Configuration adlSourcesElementsConfig = project.getConfigurations().create(adlSourcesConfigurationName, c -> {
+                    c.setCanBeResolved(false);
+                    c.setCanBeConsumed(true);
+                }).extendsFrom(searchDirectoryConfigForTask);
+                adlSourcesElementsConfig.getDependencies().add(project.getDependencies().create(adlSource.getSourceDirectories()));
+
+                //Special case - make the testAdlSearchDirectories config extend the adlSourcesElements one so we get main source set ADL sources in the
+                //test search path
+                if ("main".equals(sourceSet.getName()))
+                    testAdlSearchDirectoriesConfig.extendsFrom(adlSourcesElementsConfig);
 
                 //Auto-configure the output directories if not explicitly defined
                 for (GenerationConfiguration generation : adlTask.getGenerations().allGenerations())
