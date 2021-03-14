@@ -1,0 +1,16 @@
+module sub.cat {
+
+/// Puss, puss, puss
+struct Cat {
+    String name;
+    Int32 age;
+};
+
+struct Vet {
+    String name;
+    String clinicLocation;
+    Vector<Cat> patients;
+};
+
+
+};
