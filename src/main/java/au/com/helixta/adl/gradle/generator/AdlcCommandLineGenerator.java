@@ -3,6 +3,7 @@ package au.com.helixta.adl.gradle.generator;
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
+import au.com.helixta.adl.gradle.config.JavascriptGenerationConfiguration;
 import au.com.helixta.adl.gradle.config.TypescriptGenerationConfiguration;
 
 import java.io.File;
@@ -32,6 +33,8 @@ public class AdlcCommandLineGenerator
             return adlcJavaCommand(adlConfiguration, (JavaGenerationConfiguration)generation, fileSystemMapper);
         else if (generation instanceof TypescriptGenerationConfiguration)
             return adlcTypescriptCommand(adlConfiguration, (TypescriptGenerationConfiguration)generation, fileSystemMapper);
+        else if (generation instanceof JavascriptGenerationConfiguration)
+            return adlcJavascriptCommand(adlConfiguration, (JavascriptGenerationConfiguration)generation, fileSystemMapper);
         else
             throw new AdlGenerationException("Unknown generation type: " + generation.getClass().getName());
     }
@@ -95,10 +98,10 @@ public class AdlcCommandLineGenerator
     }
 
     /**
-     * Generate the adlc command line arguments to generate Tyrescript files for the specified Typescript generation configuration.
+     * Generate the adlc command line arguments to generate Typescript files for the specified Typescript generation configuration.
      *
      * @param adlConfiguration the top-level ADL configuration.
-     * @param generation the Java generation configuration to generate files for.
+     * @param generation the Typescript generation configuration to generate files for.
      * @param fileSystemMapper the mapper to map paths to the target execution environment.
      *
      * @return a list of command line arguments for the adlc command, not including the adlc binary itself.
@@ -138,6 +141,49 @@ public class AdlcCommandLineGenerator
             command.add("--include-rt");
         if (generation.getRuntimeModuleName() != null)
             command.add("--runtime-dir=" + generation.getRuntimeModuleName());
+
+        if (generation.getManifest().isPresent())
+            command.add("--manifest=" + fileSystemMapper.targetFile(generation.getManifest().get()));
+
+        command.addAll(generation.getCompilerArgs());
+
+        command.addAll(fileSystemMapper.targetFiles(new FileSystemMapper.LabelledFileTree(AdlFileTreeLabel.SOURCES, adlConfiguration.getSource())));
+
+        return command;
+    }
+
+    /**
+     * Generate the adlc command line arguments to generate Javascript files for the specified Javascript generation configuration.
+     *
+     * @param adlConfiguration the top-level ADL configuration.
+     * @param generation the Javascript generation configuration to generate files for.
+     * @param fileSystemMapper the mapper to map paths to the target execution environment.
+     *
+     * @return a list of command line arguments for the adlc command, not including the adlc binary itself.
+     *
+     * @throws AdlGenerationException if an error occurs generating the command line.
+     *
+     * @see <a href="https://github.com/timbod7/adl/blob/master/docs/compiler.md">ADL Javascript command</a>
+     */
+    private List<String> adlcJavascriptCommand(AdlConfiguration adlConfiguration,
+                                               JavascriptGenerationConfiguration generation,
+                                               FileSystemMapper fileSystemMapper)
+    throws AdlGenerationException
+    {
+        List<String> command = new ArrayList<>();
+        command.add("javascript");
+
+        command.add("--outputdir=" + fileSystemMapper.targetOutputDirectory(generation.getOutputDirectory().get()));
+
+        for (File searchDir : adlConfiguration.getSearchDirectories())
+        {
+            String targetSearchDir = fileSystemMapper.targetInputDirectory(searchDir);
+            if (targetSearchDir != null)
+                command.add("--searchdir=" + fileSystemMapper.targetInputDirectory(searchDir));
+        }
+
+        if (adlConfiguration.isVerbose())
+            command.add("--verbose");
 
         if (generation.getManifest().isPresent())
             command.add("--manifest=" + fileSystemMapper.targetFile(generation.getManifest().get()));

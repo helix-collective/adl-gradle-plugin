@@ -14,6 +14,7 @@ public abstract class GenerationsConfiguration implements ExtensionAware
 {
     private final List<JavaGenerationConfiguration> java = new ArrayList<>();
     private final List<TypescriptGenerationConfiguration> typescript = new ArrayList<>();
+    private final List<JavascriptGenerationConfiguration> javascript = new ArrayList<>();
 
     @Inject
     protected abstract ObjectFactory getObjectFactory();
@@ -30,11 +31,17 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         return typescript;
     }
 
+    public List<JavascriptGenerationConfiguration> getJavascript()
+    {
+        return javascript;
+    }
+
     public List<? extends GenerationConfiguration> allGenerations()
     {
         List<GenerationConfiguration> all = new ArrayList<>(java.size() + typescript.size());
         all.addAll(getJava());
         all.addAll(getTypescript());
+        all.addAll(getJavascript());
         return all;
     }
 
@@ -52,6 +59,13 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         typescript.add(t);
     }
 
+    public void javascript(Action<? super JavascriptGenerationConfiguration> configuration)
+    {
+        JavascriptGenerationConfiguration t = getObjectFactory().newInstance(JavascriptGenerationConfiguration.class);
+        configuration.execute(t);
+        javascript.add(t);
+    }
+
     public GenerationsConfiguration copyFrom(GenerationsConfiguration other)
     {
         for (JavaGenerationConfiguration otherConfig : other.getJava())
@@ -61,6 +75,10 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         for (TypescriptGenerationConfiguration otherConfig : other.getTypescript())
         {
             this.typescript(thisConfig -> thisConfig.copyFrom(otherConfig));
+        }
+        for (JavascriptGenerationConfiguration otherConfig : other.getJavascript())
+        {
+            this.javascript(thisConfig -> thisConfig.copyFrom(otherConfig));
         }
         return this;
     }
