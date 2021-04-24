@@ -31,6 +31,7 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         return typescript;
     }
 
+    @Nested
     public List<JavascriptGenerationConfiguration> getJavascript()
     {
         return javascript;
