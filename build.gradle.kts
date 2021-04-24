@@ -36,6 +36,7 @@ dependencies {
     testImplementation("com.github.javaparser:javaparser-core:3.18.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     gradleTest("com.google.code.gson:gson:2.8.6")
+    gradleTest("com.google.guava:guava:30.1-jre")
 }
 
 tasks {
