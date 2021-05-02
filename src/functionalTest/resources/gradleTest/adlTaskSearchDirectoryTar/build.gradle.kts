@@ -9,6 +9,7 @@ buildscript {
 
 plugins {
     `java-library`
+    id("au.com.helixta.adl")
 }
 
 repositories {

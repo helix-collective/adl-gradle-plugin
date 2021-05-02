@@ -9,6 +9,7 @@ buildscript {
 
 plugins {
     `java-library`
+    id("au.com.helixta.adl")
 }
 
 repositories {
@@ -33,16 +34,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
-val adlCreateSearchDirArchive = tasks.register<Zip>("adlCreateSearchDirArchive") {
-    from("$projectDir/libadl")
-    archiveFileName.set("libadl.zip")
-    destinationDirectory.set(file("$buildDir/libadl"))
-}
-
 val adlJava = tasks.register<AdlGenerateTask>("adlJava") {
     version = "0.14"
     source(file("$projectDir/src/main/adl"))
-    searchDirectory(file("$buildDir/libadl/libadl.zip"))
+    searchDirectory(file("$projectDir/libadl"))
     isVerbose = true
     generations {
         java {
@@ -57,7 +52,6 @@ val adlJava = tasks.register<AdlGenerateTask>("adlJava") {
             """.trimIndent()
         }
     }
-    dependsOn(adlCreateSearchDirArchive)
 }
 
 sourceSets["main"].java {

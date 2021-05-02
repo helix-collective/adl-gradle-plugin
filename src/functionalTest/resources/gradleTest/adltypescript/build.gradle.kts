@@ -9,6 +9,7 @@ buildscript {
 
 plugins {
     `java-library`
+    id("au.com.helixta.adl")
     id("com.github.node-gradle.node") version("2.2.4")
 }
 

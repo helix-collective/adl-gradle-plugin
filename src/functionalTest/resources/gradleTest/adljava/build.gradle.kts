@@ -9,6 +9,7 @@ buildscript {
 
 plugins {
     `java-library`
+    id("au.com.helixta.adl")
 }
 
 repositories {
@@ -25,7 +26,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.8.6")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
     testImplementation("org.assertj:assertj-core:3.18.1")
-    testImplementation("com.google.guava:guava:30.1-jre")
+    testImplementation("com.github.javaparser:javaparser-core:3.18.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
 
@@ -43,24 +44,17 @@ val adlJava = tasks.register<AdlGenerateTask>("adlJava") {
             outputDirectory.set(file("$projectDir/generated/java"))
             isGenerateTransitive = true
             isGenerateAdlRuntime = true
-            manifest.set(file("$projectDir/generated/manifest/adl-java"))
-        }
-        typescript {
-            outputDirectory.set(file("$projectDir/generated/typescript"))
-            isGenerateTransitive = true
-            isGenerateAdlRuntime = true
-            isGenerateResolver = true
-            manifest.set(file("$projectDir/generated/manifest/adl-typescript"))
+            headerComment = """
+                Full
+                of
+                galahs
+            """.trimIndent()
         }
     }
 }
 
 sourceSets["main"].java {
     srcDir("$projectDir/generated/java")
-}
-
-sourceSets["test"].resources {
-    srcDir("$projectDir/generated/manifest")
 }
 
 tasks {
@@ -70,6 +64,10 @@ tasks {
 
     clean {
         delete("$projectDir/generated")
+    }
+
+    processTestResources {
+        from(sourceSets.main.get().allSource)
     }
 
     register("runGradleTest") {

@@ -1,0 +1,10 @@
+module animal {
+
+/// Just like a string
+type AnimalName = String;
+
+struct SimpleAnimal {
+    AnimalName name;
+};
+
+};

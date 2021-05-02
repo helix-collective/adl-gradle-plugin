@@ -28,10 +28,25 @@ java {
     withJavadocJar()
 }
 
+val functionalTest = sourceSets.create("functionalTest")
+val functionalTestTask = tasks.register<Test>("functionalTest") {
+    group = "verification"
+    testClassesDirs = functionalTest.output.classesDirs
+    classpath = functionalTest.runtimeClasspath
+    useJUnitPlatform()
+
+    outputs.dir(layout.buildDirectory.dir("functest"))
+    workingDir(layout.buildDirectory.dir("functest"))
+}
+
 dependencies {
     implementation("com.github.docker-java:docker-java-core:3.2.7")
     implementation("com.github.docker-java:docker-java-transport-httpclient5:3.2.7")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.1")
+    "functionalTestImplementation"("org.junit.jupiter:junit-jupiter-api:5.7.1")
+    "functionalTestImplementation"("org.assertj:assertj-core:3.18.1")
+    "functionalTestRuntimeOnly"("org.junit.jupiter:junit-jupiter-engine")
+    "functionalTestImplementation"("io.github.classgraph:classgraph:4.8.104")
     testImplementation("org.assertj:assertj-core:3.18.1")
     testImplementation("com.github.javaparser:javaparser-core:3.18.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
@@ -39,9 +54,23 @@ dependencies {
     gradleTest("com.google.guava:guava:30.1-jre")
 }
 
+/*
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
+ */
+
 tasks {
     test {
         useJUnitPlatform()
+    }
+
+    check {
+        dependsOn(functionalTestTask)
+    }
+
+    gradlePlugin {
+        testSourceSets(functionalTest)
     }
 
     abstract class AdlPlatformTestGenerator(val adlPlatform: String) : org.ysb33r.gradle.gradletest.TestGenerator() {
