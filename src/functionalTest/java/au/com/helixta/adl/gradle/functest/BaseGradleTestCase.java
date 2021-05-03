@@ -4,17 +4,15 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.Resource;
 import io.github.classgraph.ScanResult;
 import org.gradle.testkit.runner.BuildResult;
+import org.gradle.testkit.runner.BuildTask;
 import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.TaskOutcome;
-import org.gradle.testkit.runner.internal.PluginUnderTestMetadataReading;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -26,31 +24,39 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.junit.jupiter.api.DynamicTest.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
-class FirstFunctionalTest
+abstract class BaseGradleTestCase
 {
     @TempDir
-    Path testProjectDir;
+    Path tempDir;
 
-    //private File settingsFile;
-    //private File buildFile;
+    private Path projectWorkspace;
 
     @BeforeEach
     private void setup()
     {
-        //settingsFile = new File(testProjectDir, "settings.gradle");
-        //buildFile = new File(testProjectDir, "build.gradle");
+        String workspaceProperty = System.getProperty("test.projectworkspace.directory");
+        if (workspaceProperty != null)
+            workspaceProperty = workspaceProperty.trim();
+        if (workspaceProperty != null && workspaceProperty.isEmpty())
+            workspaceProperty = null;
+        if (workspaceProperty != null)
+            projectWorkspace = Paths.get(workspaceProperty);
+        else
+            projectWorkspace = tempDir;
     }
 
+    protected abstract Path getTestWorkspace(Path projectWorkspace);
+
     @TestFactory
-    List<DynamicTest> testScanning()
+    List<DynamicTest> adlTestCases()
     throws IOException
     {
-        System.out.println("Test dir: " + Paths.get(".").toRealPath());
-
-        System.out.println("Classpath: " + PluginUnderTestMetadataReading.readImplementationClasspath());
+        Path testWorkspace = getTestWorkspace(projectWorkspace);
+        Files.createDirectories(testWorkspace);
+        System.out.println("Test workspace: " + testWorkspace.toRealPath());
 
         List<DynamicTest> tests = new ArrayList<>();
 
@@ -63,14 +69,14 @@ class FirstFunctionalTest
             for (Resource item : items)
             {
                 String buildGradlePath = item.getPathRelativeToClasspathElement();
-                System.out.println(buildGradlePath);
+                //System.out.println(buildGradlePath);
                 String parentPath = parentPath(buildGradlePath);
 
                 //Copy resources to target project dir
                 for (Resource child : scanResult.getResourcesMatchingPattern(Pattern.compile("^" + Pattern.quote(parentPath) + ".*")))
                 {
-                    System.out.println(" > " + child + " (" + child.getPathRelativeToClasspathElement() + ")");
-                    Path targetFile = testProjectDir.resolve(child.getPathRelativeToClasspathElement());
+                    //System.out.println(" > " + child + " (" + child.getPathRelativeToClasspathElement() + ")");
+                    Path targetFile = testWorkspace.resolve(child.getPathRelativeToClasspathElement());
                     Files.createDirectories(targetFile.getParent());
                     try (InputStream is = child.open())
                     {
@@ -78,25 +84,34 @@ class FirstFunctionalTest
                     }
                 }
 
-                //Set up and create the test
-                Path gradleFile = testProjectDir.resolve(buildGradlePath);
+                //Set up and create the tests
+                Path gradleFile = testWorkspace.resolve(buildGradlePath);
 
-                Executable ex = () -> {
+                Executable ex = () ->
+                {
+                    checkAssumptions();
                     System.out.println("Running " + buildGradlePath);
                     BuildResult result = GradleRunner.create()
                                                      //.withDebug(true)
                                                      .withProjectDir(gradleFile.getParent().toFile())
-                                                     .withArguments("runGradleTest")
+                                                     .withArguments(getTestArguments())
                                                      .withPluginClasspath()
                                                      .forwardOutput()
                                                      .build();
-                    System.out.println(gradleFile.getParent().getFileName().toString() + ": " + result.task(":runGradleTest").getOutcome());
+                    BuildTask taskResult = result.task(":runGradleTest");
+                    System.out.println(gradleFile.getParent().getFileName().toString() + ": " + taskResult.getOutcome());
+                    assertThat(taskResult.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
                 };
                 tests.add(dynamicTest(gradleFile.getParent().getFileName().toString(), gradleFile.toUri(), ex));
             }
         }
 
         return tests;
+    }
+
+    protected List<String> getTestArguments()
+    {
+        return Arrays.asList("--info", "clean", "runGradleTest");
     }
 
     private static String parentPath(String path)
@@ -108,31 +123,8 @@ class FirstFunctionalTest
             return path.substring(0, slashIndex + 1);
     }
 
-    /*
-    //@Test
-    void test()
-    throws IOException
+    protected void checkAssumptions()
     {
-        Files.write(buildFile.toPath(), Arrays.asList(
-                "task helloWorld {",
-                "    doLast {",
-                "        logger.quiet 'Hello world!'",
-                "    }",
-                "}"
-        ));
-
-        BuildResult result = GradleRunner.create()
-                                         //.withDebug(true)
-                                         .withProjectDir(testProjectDir)
-                                         .withArguments("helloWorld")
-                                         .withPluginClasspath()
-                                         //.forwardOutput()
-                                         .build();
-
-        assertThat(result.task(":helloWorld").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-
-        //System.out.println(result);
-        //System.out.println(result.getOutput());
+        //No base assumptions
     }
-     */
 }
