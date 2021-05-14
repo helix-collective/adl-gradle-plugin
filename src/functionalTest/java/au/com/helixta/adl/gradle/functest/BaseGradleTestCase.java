@@ -111,7 +111,7 @@ abstract class BaseGradleTestCase
 
     protected List<String> getTestArguments()
     {
-        return Arrays.asList("--info", "clean", "runGradleTest");
+        return Arrays.asList("--info", "--stacktrace", "clean", "runGradleTest");
     }
 
     private static String parentPath(String path)
