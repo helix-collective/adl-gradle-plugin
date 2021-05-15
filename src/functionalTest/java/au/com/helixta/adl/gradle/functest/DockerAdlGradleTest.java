@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Runs Gradle integration test projects with Docker ADL platform configured.
+ */
 class DockerAdlGradleTest extends BaseGradleTestCase
 {
     @Override

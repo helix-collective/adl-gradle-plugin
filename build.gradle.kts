@@ -27,6 +27,7 @@ java {
     withJavadocJar()
 }
 
+val gradleTestFilter = System.getProperty("gradletest")
 val functionalTest = sourceSets.create("functionalTest")
 val functionalTestTask = tasks.register<Test>("functionalTest") {
     group = "verification"
@@ -34,6 +35,7 @@ val functionalTestTask = tasks.register<Test>("functionalTest") {
     classpath = functionalTest.runtimeClasspath
     useJUnitPlatform()
     systemProperty("test.projectworkspace.directory", layout.buildDirectory.dir("functest").get().asFile.path)
+    systemProperty("gradletest", gradleTestFilter)
     outputs.dir(layout.buildDirectory.dir("functest"))
     workingDir(layout.buildDirectory.dir("functest"))
 
@@ -42,14 +44,16 @@ val functionalTestTask = tasks.register<Test>("functionalTest") {
         override fun beforeTest(testDescriptor: TestDescriptor) {}
         //Print names of tests after they run
         override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {
-            if (result.resultType != TestResult.ResultType.SKIPPED) {
+            if (result.resultType != TestResult.ResultType.SKIPPED || gradleTestFilter != null) {
                 logger.lifecycle("\t${result.resultType} - ${testDescriptor.className?.substringAfterLast(".")} : ${testDescriptor.displayName}")
             }
         }
         //Print suite class names that are full of skipped tests that indicate they contain tests that cannot run on this platform
         override fun afterSuite(suite: TestDescriptor, result: TestResult) {
-            if (suite.className != null && result.skippedTestCount > 0) {
-                logger.warn("\tIntegration tests in ${suite.name} cannot run on this platform - they are being skipped.")
+            if (gradleTestFilter == null) {
+                if (suite.className != null && result.skippedTestCount > 0) {
+                    logger.warn("\tIntegration tests in ${suite.name} cannot run on this platform - they are being skipped.")
+                }
             }
         }
     })

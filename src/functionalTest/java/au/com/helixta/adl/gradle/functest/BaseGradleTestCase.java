@@ -25,18 +25,58 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
+/**
+ * Base test class for running a set of integration test Gradle projects with a particular configuration.
+ * Subclasses will apply additional configuration through overridden methods to run tests in a specific way.
+ */
 abstract class BaseGradleTestCase
 {
+    /**
+     * Temporary directory used for making workspace directories when not explicitly configured.
+     */
     @TempDir
     Path tempDir;
 
+    /**
+     * Base workspace directory where tests will be extracted under.
+     */
     private Path projectWorkspace;
+
+    /**
+     * By setting this system property, a user will be able to run tests with specific names only by using
+     * a RegExp pattern.
+     */
+    private static final Pattern testFilter = testFilterToPattern(System.getProperty("gradletest"));
+
+    /**
+     * Turns a test filter into a pattern suitable for filtering test names.
+     *
+     * @param propertyValue the test filter property value.
+     *
+     * @return the pattern, or null if no filtering should be applied.
+     */
+    private static Pattern testFilterToPattern(String propertyValue)
+    {
+        if (propertyValue == null)
+            return null;
+
+        propertyValue = propertyValue.trim();
+        if (propertyValue.isEmpty())
+            return null;
+
+        return Pattern.compile(propertyValue, Pattern.CASE_INSENSITIVE);
+    }
 
     @BeforeEach
     private void setup()
     {
+        //When run from Gradle, directory will be passed in which will be underneath the build
+        //directory somewhere
+        //When run from elsewhere and the property has not been set, just use a temporary directory
+        //which gets blown away at the end
         String workspaceProperty = System.getProperty("test.projectworkspace.directory");
         if (workspaceProperty != null)
             workspaceProperty = workspaceProperty.trim();
@@ -48,8 +88,24 @@ abstract class BaseGradleTestCase
             projectWorkspace = tempDir;
     }
 
+    /**
+     * Returns the test workspace to use for extracting test projects to.
+     * Each test type will have an appropriately named workspace directory.
+     *
+     * @param projectWorkspace the base project workspace to create test workspaces under.
+     *
+     * @return workspace directory for the current test type.
+     */
     protected abstract Path getTestWorkspace(Path projectWorkspace);
 
+    /**
+     * Generates tests, one for each gradle project found underneath the 'gradleTest' base directory
+     * on the classpath.
+     *
+     * @return a set of tests.
+     *
+     * @throws IOException if an error occurs.
+     */
     @TestFactory
     List<DynamicTest> adlTestCases()
     throws IOException
@@ -89,7 +145,7 @@ abstract class BaseGradleTestCase
 
                 Executable ex = () ->
                 {
-                    checkAssumptions();
+                    checkAssumptions(gradleFile);
                     System.out.println("Running " + buildGradlePath);
                     BuildResult result = GradleRunner.create()
                                                      //.withDebug(true)
@@ -109,11 +165,21 @@ abstract class BaseGradleTestCase
         return tests;
     }
 
+    /**
+     * @return arguments to gradle for running the test project.
+     */
     protected List<String> getTestArguments()
     {
         return Arrays.asList("--info", "--stacktrace", "clean", "runGradleTest");
     }
 
+    /**
+     * Given a classpath path, returns the parent path.
+     *
+     * @param path classpath path.
+     *
+     * @return parent of the path.
+     */
     private static String parentPath(String path)
     {
         int slashIndex = path.lastIndexOf('/');
@@ -123,8 +189,16 @@ abstract class BaseGradleTestCase
             return path.substring(0, slashIndex + 1);
     }
 
-    protected void checkAssumptions()
+    /**
+     * Runs test assumptions for a project to be tested.  This method checks filtering logic.  Subclasses may
+     * add additional assumptions such as platform checks.
+     *
+     * @param gradleFile Gradle project file being tested.
+     */
+    protected void checkAssumptions(Path gradleFile)
     {
-        //No base assumptions
+        //Check if system property is set that filters by test name
+        String testName = gradleFile.getParent().getFileName().toString();
+        assumeTrue(testFilter == null || testFilter.matcher(testName).matches(), "Test not executed due to gradletest filter being set.");
     }
 }
