@@ -27,23 +27,14 @@ java {
     withJavadocJar()
 }
 
-open abstract class GradleFunctionalTest : Test() {
-    /*
-    @Option(option = "gradletest", description = "Execute only integration test Gradle projects whose name match this regexp pattern, if specified.")
-    @org.gradle.api.tasks.Input
-
-     */
-    abstract var gradletestProperty: Property<String>
-
-    @Option(option = "gradletest", description = "Configures the URL to be verified.")
-    open fun setGradletest(gradletest: String) {
-        System.err.println("Set my option to: " + gradletest)
-        gradletestProperty.set(gradletest)
+open class GradleFunctionalTest : Test() {
+    @Option(option = "gradletest", description = "Only run functional tests whose project names match this regexp pattern.")
+    fun setGradletest(gradletest: String) {
+        systemProperty("gradletest", gradletest)
     }
 
-    @org.gradle.api.tasks.Input
-    open fun getGradletest(): String? {
-        return gradletestProperty.getOrNull()
+    fun gradleTestFilteringUsed(): Boolean {
+        return systemProperties.get("gradletest") != null
     }
 }
 
@@ -54,26 +45,21 @@ val functionalTestTask = tasks.register<GradleFunctionalTest>("functionalTest") 
     classpath = functionalTest.runtimeClasspath
     useJUnitPlatform()
     systemProperty("test.projectworkspace.directory", layout.buildDirectory.dir("functest").get().asFile.path)
-    //System.err.println("Gradle test value: ${getGradletest()}")
-    //getGradletest()?.let { systemProperty("gradletest", it) }
-    systemProperty("gradletest", gradletestProperty)
     outputs.dir(layout.buildDirectory.dir("functest"))
     workingDir(layout.buildDirectory.dir("functest"))
 
     addTestListener(object : TestListener {
-        override fun beforeSuite(suite: TestDescriptor) {
-            System.err.println("Gradle test value now: ${getGradletest()}")
-        }
+        override fun beforeSuite(suite: TestDescriptor) {}
         override fun beforeTest(testDescriptor: TestDescriptor) {}
         //Print names of tests after they run
         override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {
-            if (result.resultType != TestResult.ResultType.SKIPPED || getGradletest() != null) {
+            if (result.resultType != TestResult.ResultType.SKIPPED || gradleTestFilteringUsed()) {
                 logger.lifecycle("\t${result.resultType} - ${testDescriptor.className?.substringAfterLast(".")} : ${testDescriptor.displayName}")
             }
         }
         //Print suite class names that are full of skipped tests that indicate they contain tests that cannot run on this platform
         override fun afterSuite(suite: TestDescriptor, result: TestResult) {
-            if (getGradletest() == null) {
+            if (!gradleTestFilteringUsed()) {
                 if (suite.className != null && result.skippedTestCount > 0) {
                     logger.warn("\tIntegration tests in ${suite.name} cannot run on this platform - they are being skipped.")
                 }
