@@ -28,6 +28,7 @@ import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
+import com.sun.jna.Platform;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
@@ -96,13 +97,31 @@ public class DockerAdlGenerator implements AdlGenerator
                                                        ArchiveOperations archiveOperations)
     {
         DockerClientConfig config = dockerClientConfig(dockerConfiguration);
+
+        //For Windows, don't even try using a unix: socket
+        if (config.getDockerHost() != null && "unix".equals(config.getDockerHost().getScheme()) && Platform.isWindows())
+            throw new RuntimeException("Docker on Windows platform has not been configured. The ADL code generator requires Docker for running on this platform. Install Docker and configure environment variables such as DOCKER_HOST appropriately.");
+
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
                                             .dockerHost(config.getDockerHost())
                                             .sslConfig(config.getSSLConfig())
                                             .build();
 
-         DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
-         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
+        DockerClient docker = DockerClientImpl.getInstance(config, httpClient);
+
+        //Test that Docker is working on this platform
+        try
+        {
+            docker.pingCmd().exec();
+        }
+        catch (RuntimeException e)
+        {
+            //Unfortunately exceptions are wrapped in runtime exceptions, just treat any runtime exception as failure
+            throw new RuntimeException("Docker is not functioning properly - ADL generation failed. Check Docker configuration. " + e.getMessage(), e);
+        }
+
+        //If we get here Docker ping worked
+        return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
     }
 
     private static DockerClientConfig dockerClientConfig(DockerConfiguration config)
