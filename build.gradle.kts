@@ -45,6 +45,7 @@ val functionalTestTask = tasks.register<GradleFunctionalTest>("functionalTest") 
     classpath = functionalTest.runtimeClasspath
     useJUnitPlatform()
     systemProperty("test.projectworkspace.directory", layout.buildDirectory.dir("functest").get().asFile.path)
+    systemProperty("test.testkit.directory", layout.projectDirectory.dir("build-home").asFile.path)
     outputs.dir(layout.buildDirectory.dir("functest"))
     workingDir(layout.buildDirectory.dir("functest"))
 
@@ -79,6 +80,13 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.18.1")
     testImplementation("com.github.javaparser:javaparser-core:3.18.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+}
+
+tasks.register<Delete>("cleanFull") {
+    dependsOn(tasks.clean)
+    description = "Deletes the build directory and the functional test workspace home directory"
+    group = "build"
+    delete("build-home")
 }
 
 tasks {

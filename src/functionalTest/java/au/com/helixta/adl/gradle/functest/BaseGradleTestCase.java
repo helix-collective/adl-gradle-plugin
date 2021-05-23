@@ -46,6 +46,11 @@ abstract class BaseGradleTestCase
     private Path projectWorkspace;
 
     /**
+     * Directory to use for testkit's Gradle home directory when running tests.  May not be set, in which case testkit will use its default.
+     */
+    private Path testKitDirectory;
+
+    /**
      * By setting this system property, a user will be able to run tests with specific names only by using
      * a RegExp pattern.
      */
@@ -86,6 +91,15 @@ abstract class BaseGradleTestCase
             projectWorkspace = Paths.get(workspaceProperty);
         else
             projectWorkspace = tempDir;
+
+        //Used for Gradle home when running testkit tests
+        String testKitDirectoryProperty = System.getProperty("test.testkit.directory");
+        if (testKitDirectoryProperty != null)
+            testKitDirectoryProperty = testKitDirectoryProperty.trim();
+        if (testKitDirectoryProperty != null && testKitDirectoryProperty.isEmpty())
+            testKitDirectoryProperty = null;
+        if (testKitDirectoryProperty != null)
+            testKitDirectory = Paths.get(testKitDirectoryProperty);
     }
 
     /**
@@ -147,13 +161,16 @@ abstract class BaseGradleTestCase
                 {
                     checkAssumptions(gradleFile);
                     System.out.println("Running " + buildGradlePath);
-                    BuildResult result = GradleRunner.create()
-                                                     //.withDebug(true)
-                                                     .withProjectDir(gradleFile.getParent().toFile())
-                                                     .withArguments(getTestArguments())
-                                                     .withPluginClasspath()
-                                                     .forwardOutput()
-                                                     .build();
+                    GradleRunner runner = GradleRunner.create()
+                                                      //.withDebug(true)
+                                                      .withProjectDir(gradleFile.getParent().toFile())
+                                                      .withArguments(getTestArguments())
+                                                      .withPluginClasspath()
+                                                      .forwardOutput();
+                    if (testKitDirectory != null)
+                        runner = runner.withTestKitDir(testKitDirectory.toFile());
+                    
+                    BuildResult result = runner.build();
                     BuildTask taskResult = result.task(":runGradleTest");
                     System.out.println(gradleFile.getParent().getFileName().toString() + ": " + taskResult.getOutcome());
                     assertThat(taskResult.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
