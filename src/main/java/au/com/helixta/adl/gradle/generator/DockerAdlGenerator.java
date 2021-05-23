@@ -254,9 +254,14 @@ public class DockerAdlGenerator implements AdlGenerator
             return true;
     }
 
+    /**
+     * Generate a unique container name per invocation so that multiple instances can overlap.
+     *
+     * @return a unique Docker container name for the adl runner.
+     */
     protected String containerName()
     {
-        return "adl";
+        return "adl-gradle-" + UUID.randomUUID();
     }
 
     /**
