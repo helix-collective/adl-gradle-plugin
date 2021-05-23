@@ -59,8 +59,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * ADL generator that uses Docker contains to host a supported native ADL distribution inside it.  Can be used on platforms where a native ADL distribution is not
+ * available, but Docker is.
+ */
 public class DockerAdlGenerator implements AdlGenerator
 {
     private static final Logger log = Logging.getLogger(DockerAdlGenerator.class);
@@ -89,6 +94,20 @@ public class DockerAdlGenerator implements AdlGenerator
         this.archiveOperations = Objects.requireNonNull(archiveOperations);
     }
 
+    /**
+     * Creates a Docker ADL generator from ADL Gradle plugin configuration, testing that Docker is working on the current system.
+     *
+     * @param dockerConfiguration ADL Gradle plugin Docker configuration.
+     * @param adlLog ADL tool logger.
+     * @param adlDistributionService service used for resolving and downloading native ADL distribution binaries.
+     * @param targetMachineFactory target machine Gradle factory object.
+     * @param objectFactory Gradle object factory.
+     * @param archiveOperations Gradle archive operations object.
+     *
+     * @return Docker ADL generator.
+     *
+     * @throws RuntimeException if Docker is not available or is not functioning properly.
+     */
     public static DockerAdlGenerator fromConfiguration(DockerConfiguration dockerConfiguration,
                                                        AdlToolLogger adlLog,
                                                        AdlDistributionService adlDistributionService,
@@ -124,6 +143,13 @@ public class DockerAdlGenerator implements AdlGenerator
         return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
     }
 
+    /**
+     * Creates DockerJava configuration from an ADL Gradle plugin Docker configuration object.
+     *
+     * @param config the ADL Gradle plugin Docker configuration object.
+     *
+     * @return a DockerJava configuration object.
+     */
     private static DockerClientConfig dockerClientConfig(DockerConfiguration config)
     {
         //By default, everything configured from environment, such as environment variables
@@ -148,6 +174,15 @@ public class DockerAdlGenerator implements AdlGenerator
         return c.build();
     }
 
+    /**
+     * Pulls a Docker image from a remote repository.
+     *
+     * @param imageName the Docker image name.
+     *
+     * @return true if the image was pulled successfully, false if the image was not found in the remote repository.
+     *
+     * @throws AdlGenerationException if any error part from 'not found' occurs when attempting to pull the Docker image.
+     */
     private boolean pullDockerImage(String imageName)
     throws AdlGenerationException
     {
@@ -200,6 +235,15 @@ public class DockerAdlGenerator implements AdlGenerator
         return true;
     }
 
+    /**
+     * Checks if a Docker image already exists, attempting to pull it if it doesn't already exist locally.
+     *
+     * @param imageName the name of the Docker image.
+     *
+     * @return true if the Docker image exists either already or it was pulled, false if the Docker image does not exist locally or in a known repository.
+     *
+     * @throws AdlGenerationException if an error occurs.
+     */
     private boolean checkPullDockerImage(String imageName)
     throws AdlGenerationException
     {
@@ -215,31 +259,54 @@ public class DockerAdlGenerator implements AdlGenerator
         return "adl";
     }
 
+    /**
+     * Determines the name of the Docker image to generate for a given ADL version.
+     */
     protected String imageName(String adlVersion)
     {
         return "adl/adlc:" + adlVersion;
     }
 
+    /**
+     * @return the directory in the Docker container to copy source files to.
+     */
     protected String getSourcePathInContainer()
     {
         return "/data/sources/";
     }
 
+    /**
+     * @return the directory in the Docker container that files are generated to.
+     */
     protected String getOutputPathInContainer()
     {
         return "/data/generated/";
     }
 
+    /**
+     * @return the directory in the Docker container that manifest files are generated to.
+     */
     protected String getManifestOutputPathInContainer()
     {
         return "/data/";
     }
 
+    /**
+     * @return the directory in the Docker container that search directory ADL files are copied to.
+     */
     protected String getSearchDirectoryPathInContainer()
     {
         return "/data/searchdirs/";
     }
 
+    /**
+     * Builds a Docker image for a given ADL version by resolving/downloading a Linux ADL distribution and installing it in a Docker image.
+     *
+     * @param adlVersion the ADL distribution version to use for generating the image.
+     *
+     * @throws AdlDistributionNotFoundException if an ADL distribution with the given version was not found.
+     * @throws IOException if some other error occurs.
+     */
     private void buildDockerImage(String adlVersion)
     throws AdlDistributionNotFoundException, IOException
     {
@@ -321,6 +388,14 @@ public class DockerAdlGenerator implements AdlGenerator
         }
     }
 
+    /**
+     * Runs the ADL compiler in a Docker container to generate ADL files.  Files are copied into the appropriate host target project directory.
+     *
+     * @param adlConfiguration project-level ADL configuration.
+     * @param generation the generation configuration containing ADL source files and other related configuration.
+     *
+     * @throws AdlGenerationException if an error occurs running the ADL compiler.
+     */
     private void runAdlc(AdlConfiguration adlConfiguration, GenerationConfiguration generation)
     throws AdlGenerationException
     {
@@ -497,10 +572,19 @@ public class DockerAdlGenerator implements AdlGenerator
         docker.close();
     }
 
+    /**
+     * Reads console output from Docker and records it in a set of records which can be played back to the host console later.
+     */
     private static class ConsoleRecorder
     {
         private final List<ConsoleRecord> records = new ArrayList<>();
 
+        /**
+         * Consumes log messages from a Docker container.
+         *
+         * @param type message type, stdout or stderr.
+         * @param messageBytes bytes for the log message.
+         */
         public synchronized void add(StreamType type, byte[] messageBytes)
         {
             //Append to existing last record if the same type
@@ -518,12 +602,18 @@ public class DockerAdlGenerator implements AdlGenerator
             records.add(new ConsoleRecord(type, messageBytes));
         }
 
+        /**
+         * @return a list of all console log records that have been come from the ADL Docker container so far.
+         */
         public synchronized List<? extends ConsoleRecord> getRecords()
         {
             return new ArrayList<>(records);
         }
     }
 
+    /**
+     * A single log message record that came from Docker.
+     */
     private static class ConsoleRecord
     {
         private final StreamType type;
@@ -536,11 +626,17 @@ public class DockerAdlGenerator implements AdlGenerator
             append(messageBytes);
         }
 
+        /**
+         * @return message type, stdout or stderr.
+         */
         public StreamType getType()
         {
             return type;
         }
 
+        /**
+         * @return the entire log message.
+         */
         public String getMessage()
         {
             try
@@ -554,6 +650,9 @@ public class DockerAdlGenerator implements AdlGenerator
             }
         }
 
+        /**
+         * @return a list of log messages, separate strings for each line of log output.
+         */
         public List<String> getMessageLines()
         {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(messageBuffer.toByteArray()))))
@@ -567,6 +666,11 @@ public class DockerAdlGenerator implements AdlGenerator
             }
         }
 
+        /**
+         * Appends to the existing log message in this record.
+         *
+         * @param messageBytes raw message bytes from Docker.
+         */
         public void append(byte[] messageBytes)
         {
             try
