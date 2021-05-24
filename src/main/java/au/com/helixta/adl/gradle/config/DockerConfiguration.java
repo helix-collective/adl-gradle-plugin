@@ -21,6 +21,8 @@ public abstract class DockerConfiguration
     private String registryUsername;
     private String registryPassword;
 
+    private ImageBuildMode imageBuildMode = ImageBuildMode.USE_EXISTING;
+
     @Inject
     protected abstract ObjectFactory getObjectFactory();
 
@@ -128,6 +130,20 @@ public abstract class DockerConfiguration
         this.registryPassword = registryPassword;
     }
 
+    @Internal
+    public ImageBuildMode getImageBuildMode()
+    {
+        return imageBuildMode;
+    }
+
+    /**
+     * Sets the image build mode which controls when the Docker image for the ADL code generator is built, and whether existing images can be reused.
+     */
+    public void setImageBuildMode(ImageBuildMode imageBuildMode)
+    {
+        this.imageBuildMode = imageBuildMode;
+    }
+
     public void copyFrom(DockerConfiguration other)
     {
         setHost(other.getHost());
@@ -137,5 +153,6 @@ public abstract class DockerConfiguration
         setRegistryUrl(other.getRegistryUrl());
         setRegistryUsername(other.getRegistryUsername());
         setRegistryPassword(other.getRegistryPassword());
+        setImageBuildMode(other.getImageBuildMode());
     }
 }

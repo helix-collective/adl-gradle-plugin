@@ -3,6 +3,7 @@ package au.com.helixta.adl.gradle.generator;
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
+import au.com.helixta.adl.gradle.config.ImageBuildMode;
 import au.com.helixta.adl.gradle.config.ManifestGenerationSupport;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
@@ -56,6 +57,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -73,6 +75,9 @@ public class DockerAdlGenerator implements AdlGenerator
     private static final String TOOL_ADLC = "adlc";
     private static final String TOOL_DOCKER = "docker";
 
+    private static final String DOCKER_ADL_GENERATOR_LABEL = "au.com.helixta.adl.gradle.docker";
+
+    private final ImageBuildMode imageBuildMode;
     private final AdlToolLogger adlLog;
     private final AdlDistributionService adlDistributionService;
     private final DockerClient docker;
@@ -82,11 +87,12 @@ public class DockerAdlGenerator implements AdlGenerator
 
     private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
 
-    public DockerAdlGenerator(DockerClient docker, AdlToolLogger adlLog, AdlDistributionService adlDistributionService,
+    public DockerAdlGenerator(DockerClient docker, ImageBuildMode imageBuildMode, AdlToolLogger adlLog, AdlDistributionService adlDistributionService,
                               TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory,
                               ArchiveOperations archiveOperations)
     {
         this.docker = Objects.requireNonNull(docker);
+        this.imageBuildMode = Objects.requireNonNull(imageBuildMode);
         this.adlLog = Objects.requireNonNull(adlLog);
         this.adlDistributionService = Objects.requireNonNull(adlDistributionService);
         this.targetMachineFactory = Objects.requireNonNull(targetMachineFactory);
@@ -140,7 +146,7 @@ public class DockerAdlGenerator implements AdlGenerator
         }
 
         //If we get here Docker ping worked
-        return new DockerAdlGenerator(docker, adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
+        return new DockerAdlGenerator(docker, dockerConfiguration.getImageBuildMode(), adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
     }
 
     /**
@@ -248,10 +254,51 @@ public class DockerAdlGenerator implements AdlGenerator
     throws AdlGenerationException
     {
         List<Image> images = docker.listImagesCmd().withImageNameFilter(imageName).exec();
+
+        //There should really only be zero or one iamges in the list since it's an exact image name match
+
+        //Forced rebuild - delete any existing local image
+        if (imageBuildMode == ImageBuildMode.REBUILD)
+        {
+            for (Image image : images)
+            {
+                log.info("Image build mode is " + imageBuildMode + ", removing existing ADL Docker image " + image.getId());
+                docker.removeImageCmd(image.getId()).exec();
+            }
+            return false; //return false so that image will always be rebuilt locally
+        }
+
+        //Rebuild only if previous image is local - and allow re-pull from remotes
+        else if (imageBuildMode == ImageBuildMode.DISCARD_LOCAL)
+        {
+            for (Iterator<Image> i = images.iterator(); i.hasNext();)
+            {
+                Image image = i.next();
+                if (dockerImageIsGeneratedLocally(image))
+                {
+                    log.info("Image build mode is " + imageBuildMode + ", removing existing locally generated ADL Docker image " + image.getId());
+                    docker.removeImageCmd(image.getId()).exec();
+                    i.remove();
+                }
+            }
+        }
+
         if (images.isEmpty())
             return pullDockerImage(imageName);
         else
             return true;
+    }
+
+    /**
+     * Determines whether a Docker image was generated on this system by looking at its labels.  Will return false for images that were downloaded from remote repositories.
+     *
+     * @param image the image to check.
+     *
+     * @return true if the Docker image was generated locally, false if not.
+     */
+    protected boolean dockerImageIsGeneratedLocally(Image image)
+    {
+        return image.getLabels() != null && String.valueOf(true).equals(image.getLabels().get(DOCKER_ADL_GENERATOR_LABEL));
     }
 
     /**
@@ -364,6 +411,7 @@ public class DockerAdlGenerator implements AdlGenerator
             //Dockerfile
             byte[] dockerFileBytes =
                 ("FROM ubuntu:20.04\n" +
+                 "LABEL " + DOCKER_ADL_GENERATOR_LABEL + "=\"true\"\n" +
                  "COPY /adl/ /opt/adl/\n" +
                  "CMD [\"/opt/adl/bin/adlc\"]"
                 ).getBytes(StandardCharsets.UTF_8);
