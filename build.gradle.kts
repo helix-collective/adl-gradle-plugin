@@ -27,6 +27,14 @@ java {
     withJavadocJar()
 }
 
+tasks.jar {
+    manifest {
+        attributes(
+            "Implementation-Version" to archiveVersion
+        )
+    }
+}
+
 open class GradleFunctionalTest : Test() {
     @Option(option = "gradletest", description = "Only run functional tests whose project names match this regexp pattern.")
     fun setGradletest(gradletest: String) {

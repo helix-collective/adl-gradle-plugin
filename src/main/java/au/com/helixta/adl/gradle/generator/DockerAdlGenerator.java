@@ -298,7 +298,7 @@ public class DockerAdlGenerator implements AdlGenerator
      */
     protected boolean dockerImageIsGeneratedLocally(Image image)
     {
-        return image.getLabels() != null && String.valueOf(true).equals(image.getLabels().get(DOCKER_ADL_GENERATOR_LABEL));
+        return image.getLabels() != null && image.getLabels().get(DOCKER_ADL_GENERATOR_LABEL) != null;
     }
 
     /**
@@ -349,6 +349,18 @@ public class DockerAdlGenerator implements AdlGenerator
     protected String getSearchDirectoryPathInContainer()
     {
         return "/data/searchdirs/";
+    }
+
+    /**
+     * @return the version of the currently executing ADL Gradle plugin.
+     */
+    private String getAdlGradlePluginVersion()
+    {
+        Package pkg = DockerAdlGenerator.class.getPackage();
+        if (pkg != null && pkg.getImplementationVersion() != null)
+            return pkg.getImplementationVersion();
+
+        return "unknown";
     }
 
     /**
@@ -411,7 +423,7 @@ public class DockerAdlGenerator implements AdlGenerator
             //Dockerfile
             byte[] dockerFileBytes =
                 ("FROM ubuntu:20.04\n" +
-                 "LABEL " + DOCKER_ADL_GENERATOR_LABEL + "=\"true\"\n" +
+                 "LABEL " + DOCKER_ADL_GENERATOR_LABEL + "=\"" + getAdlGradlePluginVersion() + "\"\n" +
                  "COPY /adl/ /opt/adl/\n" +
                  "CMD [\"/opt/adl/bin/adlc\"]"
                 ).getBytes(StandardCharsets.UTF_8);
