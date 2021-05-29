@@ -68,3 +68,8 @@ System.getProperty("adl.platform")?.let {
         platform = au.com.helixta.adl.gradle.config.AdlPlatform.valueOf(it)
     }
 }
+
+//For testing, force rebuild the image every time to ensure we are testing the Docker image build logic
+tasks.withType<au.com.helixta.adl.gradle.AdlGenerateTask> {
+    docker.imageBuildMode = au.com.helixta.adl.gradle.config.ImageBuildMode.REBUILD
+}
