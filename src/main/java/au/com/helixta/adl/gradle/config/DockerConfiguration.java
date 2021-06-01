@@ -10,6 +10,7 @@ import javax.inject.Inject;
 import java.io.File;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Duration;
 
 public abstract class DockerConfiguration
 {
@@ -22,6 +23,10 @@ public abstract class DockerConfiguration
     private String registryPassword;
 
     private ImageBuildMode imageBuildMode = ImageBuildMode.USE_EXISTING;
+
+    private Duration imagePullTimeout;
+    private Duration imageBuildTimeout;
+    private Duration containerExecutionTimeout;
 
     @Inject
     protected abstract ObjectFactory getObjectFactory();
@@ -144,6 +149,39 @@ public abstract class DockerConfiguration
         this.imageBuildMode = imageBuildMode;
     }
 
+    @Internal
+    public Duration getImagePullTimeout()
+    {
+        return imagePullTimeout;
+    }
+
+    public void setImagePullTimeout(Duration imagePullTimeout)
+    {
+        this.imagePullTimeout = imagePullTimeout;
+    }
+
+    @Internal
+    public Duration getImageBuildTimeout()
+    {
+        return imageBuildTimeout;
+    }
+
+    public void setImageBuildTimeout(Duration imageBuildTimeout)
+    {
+        this.imageBuildTimeout = imageBuildTimeout;
+    }
+
+    @Internal
+    public Duration getContainerExecutionTimeout()
+    {
+        return containerExecutionTimeout;
+    }
+
+    public void setContainerExecutionTimeout(Duration containerExecutionTimeout)
+    {
+        this.containerExecutionTimeout = containerExecutionTimeout;
+    }
+
     public void copyFrom(DockerConfiguration other)
     {
         setHost(other.getHost());
@@ -154,5 +192,8 @@ public abstract class DockerConfiguration
         setRegistryUsername(other.getRegistryUsername());
         setRegistryPassword(other.getRegistryPassword());
         setImageBuildMode(other.getImageBuildMode());
+        setImagePullTimeout(other.getImagePullTimeout());
+        setImageBuildTimeout(other.getImageBuildTimeout());
+        setContainerExecutionTimeout(other.getContainerExecutionTimeout());
     }
 }

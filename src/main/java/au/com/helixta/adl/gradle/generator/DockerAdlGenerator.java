@@ -14,6 +14,7 @@ import com.github.dockerjava.api.async.ResultCallbackTemplate;
 import com.github.dockerjava.api.command.BuildImageResultCallback;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.PullImageResultCallback;
+import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.exception.DockerException;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.BuildResponseItem;
@@ -62,6 +63,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -77,7 +79,7 @@ public class DockerAdlGenerator implements AdlGenerator
 
     private static final String DOCKER_ADL_GENERATOR_LABEL = "au.com.helixta.adl.gradle.docker";
 
-    private final ImageBuildMode imageBuildMode;
+    private final DockerConfiguration dockerConfiguration;
     private final AdlToolLogger adlLog;
     private final AdlDistributionService adlDistributionService;
     private final DockerClient docker;
@@ -87,12 +89,12 @@ public class DockerAdlGenerator implements AdlGenerator
 
     private final AdlcCommandLineGenerator adlcCommandProcessor = new AdlcCommandLineGenerator();
 
-    public DockerAdlGenerator(DockerClient docker, ImageBuildMode imageBuildMode, AdlToolLogger adlLog, AdlDistributionService adlDistributionService,
+    public DockerAdlGenerator(DockerClient docker, DockerConfiguration dockerConfiguration, AdlToolLogger adlLog, AdlDistributionService adlDistributionService,
                               TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory,
                               ArchiveOperations archiveOperations)
     {
         this.docker = Objects.requireNonNull(docker);
-        this.imageBuildMode = Objects.requireNonNull(imageBuildMode);
+        this.dockerConfiguration = Objects.requireNonNull(dockerConfiguration);
         this.adlLog = Objects.requireNonNull(adlLog);
         this.adlDistributionService = Objects.requireNonNull(adlDistributionService);
         this.targetMachineFactory = Objects.requireNonNull(targetMachineFactory);
@@ -146,7 +148,7 @@ public class DockerAdlGenerator implements AdlGenerator
         }
 
         //If we get here Docker ping worked
-        return new DockerAdlGenerator(docker, dockerConfiguration.getImageBuildMode(), adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
+        return new DockerAdlGenerator(docker, dockerConfiguration, adlLog, adlDistributionService, targetMachineFactory, objectFactory, archiveOperations);
     }
 
     /**
@@ -226,7 +228,10 @@ public class DockerAdlGenerator implements AdlGenerator
         });
         try
         {
-            pullResponse.awaitCompletion(); //TODO timeouts
+            if (dockerConfiguration.getImagePullTimeout() == null)
+                pullResponse.awaitCompletion();
+            else
+                pullResponse.awaitCompletion(dockerConfiguration.getImagePullTimeout().toMillis(), TimeUnit.MILLISECONDS);
         }
         catch (InterruptedException e)
         {
@@ -258,25 +263,25 @@ public class DockerAdlGenerator implements AdlGenerator
         //There should really only be zero or one iamges in the list since it's an exact image name match
 
         //Forced rebuild - delete any existing local image
-        if (imageBuildMode == ImageBuildMode.REBUILD)
+        if (dockerConfiguration.getImageBuildMode() == ImageBuildMode.REBUILD)
         {
             for (Image image : images)
             {
-                log.info("Image build mode is " + imageBuildMode + ", removing existing ADL Docker image " + image.getId());
+                log.info("Image build mode is " + dockerConfiguration.getImageBuildMode() + ", removing existing ADL Docker image " + image.getId());
                 docker.removeImageCmd(image.getId()).exec();
             }
             return false; //return false so that image will always be rebuilt locally
         }
 
         //Rebuild only if previous image is local - and allow re-pull from remotes
-        else if (imageBuildMode == ImageBuildMode.DISCARD_LOCAL)
+        else if (dockerConfiguration.getImageBuildMode() == ImageBuildMode.DISCARD_LOCAL)
         {
             for (Iterator<Image> i = images.iterator(); i.hasNext();)
             {
                 Image image = i.next();
                 if (dockerImageIsGeneratedLocally(image))
                 {
-                    log.info("Image build mode is " + imageBuildMode + ", removing existing locally generated ADL Docker image " + image.getId());
+                    log.info("Image build mode is " + dockerConfiguration.getImageBuildMode() + ", removing existing locally generated ADL Docker image " + image.getId());
                     docker.removeImageCmd(image.getId()).exec();
                     i.remove();
                 }
@@ -435,21 +440,24 @@ public class DockerAdlGenerator implements AdlGenerator
 
             tarOut.close();
 
-            docker.buildImageCmd(new ByteArrayInputStream(dOut.toByteArray()))
-                  .withTags(ImmutableSet.of(imageName(adlVersion)))
-                  .exec(new BuildImageResultCallback()
-                  {
-                      @Override
-                      public void onNext(BuildResponseItem item)
-                      {
-                          super.onNext(item);
-                          if (item.getStream() != null)
-                          {
-                              adlLog.info(TOOL_DOCKER, item.getStream().trim());
-                          }
-                      }
-                  })
-                  .awaitImageId(); //TODO timeouts
+            BuildImageResultCallback callback = docker.buildImageCmd(new ByteArrayInputStream(dOut.toByteArray()))
+                                                      .withTags(ImmutableSet.of(imageName(adlVersion)))
+                                                      .exec(new BuildImageResultCallback()
+                                                      {
+                                                          @Override
+                                                          public void onNext(BuildResponseItem item)
+                                                          {
+                                                              super.onNext(item);
+                                                              if (item.getStream() != null)
+                                                              {
+                                                                  adlLog.info(TOOL_DOCKER, item.getStream().trim());
+                                                              }
+                                                          }
+                                                      });
+            if (dockerConfiguration.getImageBuildTimeout() == null)
+                callback.awaitImageId();
+            else
+                callback.awaitImageId(dockerConfiguration.getImageBuildTimeout().toMillis(), TimeUnit.MILLISECONDS);
         }
     }
 
@@ -541,7 +549,13 @@ public class DockerAdlGenerator implements AdlGenerator
 
             docker.startContainerCmd(containerId).exec();
 
-            Integer result = docker.waitContainerCmd(containerId).start().awaitStatusCode(); //TODO timeout
+            WaitContainerResultCallback resultCallback = docker.waitContainerCmd(containerId).start();
+            Integer result;
+            if (dockerConfiguration.getContainerExecutionTimeout() == null)
+                result = resultCallback.awaitStatusCode();
+            else
+                result = resultCallback.awaitStatusCode(dockerConfiguration.getContainerExecutionTimeout().toMillis(), TimeUnit.MILLISECONDS);
+
             boolean hasErrors = (result == null || result != 0);
 
             //Stream console records to logger now
