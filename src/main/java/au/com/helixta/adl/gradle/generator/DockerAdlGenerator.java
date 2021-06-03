@@ -5,9 +5,9 @@ import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.ImageBuildMode;
 import au.com.helixta.adl.gradle.config.ManifestGenerationSupport;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
+import au.com.helixta.adl.gradle.distribution.DistributionNotFoundException;
+import au.com.helixta.adl.gradle.distribution.DistributionSpecifier;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.async.ResultCallbackTemplate;
@@ -373,18 +373,18 @@ public class DockerAdlGenerator implements AdlGenerator
      *
      * @param adlVersion the ADL distribution version to use for generating the image.
      *
-     * @throws AdlDistributionNotFoundException if an ADL distribution with the given version was not found.
+     * @throws DistributionNotFoundException if an ADL distribution with the given version was not found.
      * @throws IOException if some other error occurs.
      */
     private void buildDockerImage(String adlVersion)
-    throws AdlDistributionNotFoundException, IOException
+    throws DistributionNotFoundException, IOException
     {
         log.info("Building Docker image for ADL " + adlVersion + "...");
 
         TargetMachine linuxMachine = targetMachineFactory.getLinux().getX86_64();
-        AdlDistributionSpec specForDockerImage = new AdlDistributionSpec(adlVersion, new DefaultArchitecture(linuxMachine.getArchitecture().getName()),
-                                                                                                             new DefaultOperatingSystem(linuxMachine.getOperatingSystemFamily().getName()));
-        File adlDistributionArchive = adlDistributionService.resolveAdlDistributionArchive(specForDockerImage);
+        DistributionSpecifier specForDockerImage = new DistributionSpecifier(adlVersion, new DefaultArchitecture(linuxMachine.getArchitecture().getName()),
+                                                                             new DefaultOperatingSystem(linuxMachine.getOperatingSystemFamily().getName()));
+        File adlDistributionArchive = adlDistributionService.resolveDistributionArchive(specForDockerImage);
 
         //Build a TAR file with the ADL distribution archive and a Dockerfile
         try (ByteArrayOutputStream dOut = new ByteArrayOutputStream();
@@ -629,7 +629,7 @@ public class DockerAdlGenerator implements AdlGenerator
             {
                 buildDockerImage(configuration.getVersion());
             }
-            catch (AdlDistributionNotFoundException e)
+            catch (DistributionNotFoundException e)
             {
                 throw new AdlGenerationException("No Docker image or ADL distribution found for ADL version " + configuration.getVersion(), e);
             }

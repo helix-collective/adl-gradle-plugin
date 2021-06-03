@@ -6,7 +6,7 @@ import au.com.helixta.adl.gradle.config.AdlPlatform;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
+import au.com.helixta.adl.gradle.distribution.DistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
@@ -102,7 +102,7 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
                 //Successfully resolved, use native
                 platform = AdlPlatform.NATIVE;
             }
-            catch (AdlDistributionNotFoundException e)
+            catch (DistributionNotFoundException e)
             {
                 //Not found - fallback to docker
                 platform = AdlPlatform.DOCKER;

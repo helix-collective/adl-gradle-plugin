@@ -2,9 +2,9 @@ package au.com.helixta.adl.gradle.generator;
 
 import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionNotFoundException;
+import au.com.helixta.adl.gradle.distribution.DistributionNotFoundException;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
-import au.com.helixta.adl.gradle.distribution.AdlDistributionSpec;
+import au.com.helixta.adl.gradle.distribution.DistributionSpecifier;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.nativeplatform.platform.NativePlatform;
@@ -37,12 +37,12 @@ public class NativeAdlGenerator implements AdlGenerator
         this.fileSystemMapper = new ArchiveExpandingLocalFileSystemMapper(archiveOperations);
     }
 
-    protected AdlDistributionSpec adlDistributionSpecForConfiguration(AdlConfiguration configuration)
+    protected DistributionSpecifier adlDistributionSpecForConfiguration(AdlConfiguration configuration)
     {
         NativePlatform host = DefaultNativePlatform.host();
-        return new AdlDistributionSpec(configuration.getVersion(),
-                                       host.getArchitecture(),
-                                       host.getOperatingSystem());
+        return new DistributionSpecifier(configuration.getVersion(),
+                                         host.getArchitecture(),
+                                         host.getOperatingSystem());
     }
 
     /**
@@ -53,9 +53,9 @@ public class NativeAdlGenerator implements AdlGenerator
      * @return the unpacked ADL distribution directory.
      */
     public File resolveAdlDistribution(AdlConfiguration configuration)
-    throws AdlDistributionNotFoundException, IOException
+    throws DistributionNotFoundException, IOException
     {
-        return adlDistributionService.adlDistribution(adlDistributionSpecForConfiguration(configuration));
+        return adlDistributionService.resolveDistribution(adlDistributionSpecForConfiguration(configuration));
     }
 
     @Override
@@ -108,7 +108,7 @@ public class NativeAdlGenerator implements AdlGenerator
                 }
             }
         }
-        catch (IOException | AdlDistributionNotFoundException e)
+        catch (IOException | DistributionNotFoundException e)
         {
             throw new AdlGenerationException(e);
         }
