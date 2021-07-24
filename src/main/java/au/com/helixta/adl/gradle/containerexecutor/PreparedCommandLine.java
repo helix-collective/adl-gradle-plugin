@@ -30,13 +30,13 @@ public class PreparedCommandLine
      *
      * @param hostFile the file or directory on the host.
      * @param label a label for the file or directory argument.  Used for generating file names in the container.
-     * @param fileMode determines how and when the file will be updated between host and container.
+     * @param fileTransferMode determines how and when the file will be updated between host and container.
      *
      * @return this command line.
      */
-    public PreparedCommandLine argument(File hostFile, String label, FileMode fileMode)
+    public PreparedCommandLine argument(File hostFile, String label, FileTransferMode fileTransferMode, FileType fileType)
     {
-        arguments.add(new ContainerFile(label, hostFile, fileMode));
+        arguments.add(new ContainerFile(label, hostFile, fileTransferMode, fileType));
         return this;
     }
 
@@ -108,13 +108,15 @@ public class PreparedCommandLine
     {
         private final String label;
         private final File hostFile;
-        private final FileMode fileMode;
+        private final FileTransferMode fileTransferMode;
+        private final FileType fileType;
 
-        public ContainerFile(String label, File hostFile, FileMode fileMode)
+        public ContainerFile(String label, File hostFile, FileTransferMode fileTransferMode, FileType fileType)
         {
             this.label = Objects.requireNonNull(label);
             this.hostFile = Objects.requireNonNull(hostFile);
-            this.fileMode = Objects.requireNonNull(fileMode);
+            this.fileTransferMode = Objects.requireNonNull(fileTransferMode);
+            this.fileType = Objects.requireNonNull(fileType);
         }
 
         /**
@@ -136,9 +138,17 @@ public class PreparedCommandLine
         /**
          * @return file mode that determines how and when the file will be updated between host and container.
          */
-        public FileMode getFileMode()
+        public FileTransferMode getFileMode()
         {
-            return fileMode;
+            return fileTransferMode;
+        }
+
+        /**
+         * @return whether a directory (or archive) or a single file is being copied.
+         */
+        public FileType getFileType()
+        {
+            return fileType;
         }
 
         @Override
@@ -158,9 +168,9 @@ public class PreparedCommandLine
     }
 
     /**
-     * Deterimnes how and when a file will be updated between host and container.
+     * Determines how and when a file will be updated between host and container.
      */
-    public static enum FileMode
+    public static enum FileTransferMode
     {
         /**
          * An input-only file for the container.  File is transferred to the container before execution but updates are not sent back to the host.
@@ -176,5 +186,21 @@ public class PreparedCommandLine
          * File is transferred to the container before execution and transferred back after execution.
          */
         INPUT_OUTPUT
+    }
+
+    /**
+     * Determines whether file should be treated as a directory or a collection of files, or a single file.
+     */
+    public static enum FileType
+    {
+        /**
+         * File is a directory or an archive that will be treated as a directory of files.
+         */
+        DIRECTORY,
+
+        /**
+         * File is a single file, not a directory.
+         */
+        SINGLE_FILE;
     }
 }

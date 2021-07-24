@@ -1,8 +1,8 @@
 package au.com.helixta.adl.gradle.containerexecutor;
 
-import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.ArchiveProcessor;
 import com.github.dockerjava.api.DockerClient;
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -18,6 +18,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -94,21 +96,43 @@ public class DockerFileMapper
         //Iterate through all the files
         for (Map.Entry<? extends PreparedCommandLine.ContainerFile, String> mappingEntry : containerFileMappings.entrySet())
         {
-            //Only do this for files that are input or input/output
-            if (mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileMode.INPUT || mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileMode.INPUT_OUTPUT)
+            //Only copy file contents for files that are input or input/output
+            if (mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileTransferMode.INPUT || mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileTransferMode.INPUT_OUTPUT)
+            {
+                if (mappingEntry.getKey().getFileType() == PreparedCommandLine.FileType.DIRECTORY)
+                {
+                    String containerDirectory = mappingEntry.getValue();
+
+                    //Might be an archive file instead of directory - we want to support this
+                    File directoryOrArchive = mappingEntry.getKey().getHostFile();
+                    FileTree dirTree = archiveProcessor.archiveToFileTree(directoryOrArchive);
+
+                    if (dirTree == null)
+                        dirTree = objectFactory.fileTree().from(directoryOrArchive);
+
+                    try (SourceTarArchive containerDirectoryTar = createTarFromFileTree(dirTree, containerDirectory))
+                    {
+                        copySourceFilesFromTarToDockerContainer(containerDirectoryTar, dockerContainerId);
+                    }
+                }
+                else if (mappingEntry.getKey().getFileType() == PreparedCommandLine.FileType.SINGLE_FILE)
+                {
+                    //Single file
+                    File singleFile = mappingEntry.getKey().getHostFile();
+                    String containerFileName = mappingEntry.getValue();
+                    try (SourceTarArchive singleFileTar = createTarFromSingleFile(singleFile, containerFileName))
+                    {
+                        copySourceFilesFromTarToDockerContainer(singleFileTar, dockerContainerId);
+                    }
+                }
+                else
+                    throw new Error("Unknown file type: " + mappingEntry.getKey().getFileType());
+            }
+            //For output-only files, only generate empty directories
+            else if (mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileTransferMode.OUTPUT)
             {
                 String containerDirectory = mappingEntry.getValue();
-
-                //Might be an archive file instead of directory - we want to support this
-                File directoryOrArchive = mappingEntry.getKey().getHostFile();
-                FileTree dirTree = archiveProcessor.archiveToFileTree(directoryOrArchive);
-
-                //TODO what if we have a single file?
-
-                if (dirTree == null)
-                    dirTree = objectFactory.fileTree().from(directoryOrArchive);
-
-                try (SourceTarArchive containerDirectoryTar = createTarFromFileTree(dirTree, containerDirectory))
+                try (SourceTarArchive containerDirectoryTar = createEmptyDirectoryTar(containerDirectory))
                 {
                     copySourceFilesFromTarToDockerContainer(containerDirectoryTar, dockerContainerId);
                 }
@@ -124,13 +148,24 @@ public class DockerFileMapper
         for (Map.Entry<? extends PreparedCommandLine.ContainerFile, String> mappingEntry : containerFileMappings.entrySet())
         {
             //Only do this for files that are output or input/output
-            if (mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileMode.OUTPUT || mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileMode.INPUT_OUTPUT)
+            if (mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileTransferMode.OUTPUT || mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileTransferMode.INPUT_OUTPUT)
             {
-                String containerDirectory = mappingEntry.getValue();
+                if (mappingEntry.getKey().getFileType() == PreparedCommandLine.FileType.DIRECTORY)
+                {
+                    String containerDirectory = mappingEntry.getValue();
 
-                Directory directory = objectFactory.directoryProperty().fileValue(mappingEntry.getKey().getHostFile()).get();
-                int copyCount = copyFilesFromDockerContainer(containerDirectory, directory, dockerContainerId);
-                copyFileCounts.put(mappingEntry.getKey(), copyCount);
+                    Directory directory = objectFactory.directoryProperty().fileValue(mappingEntry.getKey().getHostFile()).get();
+                    int copyCount = copyFilesFromDockerContainer(containerDirectory, directory, dockerContainerId);
+                    copyFileCounts.put(mappingEntry.getKey(), copyCount);
+                }
+                else if (mappingEntry.getKey().getFileType() == PreparedCommandLine.FileType.SINGLE_FILE)
+                {
+                    String containerFile = mappingEntry.getValue();
+                    copySingleFileFromDockerContainer(containerFile, mappingEntry.getKey().getHostFile(), dockerContainerId);
+                    copyFileCounts.put(mappingEntry.getKey(), 1);
+                }
+                else
+                    throw new Error("Unknown file type: " + mappingEntry.getKey().getFileType());
             }
         }
 
@@ -184,11 +219,11 @@ public class DockerFileMapper
                     String relativeName = relativizeTarPath(containerDirectory, entry.getName());
 
                     //Copy the file data to the host filesystem
-                    File adlOutputFile = hostOutputDirectory.file(relativeName).getAsFile();
-                    if (filter.accept(adlOutputFile.getParentFile(), adlOutputFile.getName()))
+                    File outputFile = hostOutputDirectory.file(relativeName).getAsFile();
+                    if (filter.accept(outputFile.getParentFile(), outputFile.getName()))
                     {
-                        FileUtils.forceMkdirParent(adlOutputFile);
-                        Files.copy(tis, adlOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        FileUtils.forceMkdirParent(outputFile);
+                        Files.copy(tis, outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                         generatedFileCount++;
                     }
                 }
@@ -197,6 +232,43 @@ public class DockerFileMapper
         }
 
         return generatedFileCount;
+    }
+
+    /**
+     * Copies a single file from the container to the host.
+     *
+     * @param containerFile the path of the file in the Docker container to copy.
+     * @param hostFile the destination file on the host.
+     * @param containerId the Docker container ID.
+     *
+     * @return the number of files copied.  Does not include directories.
+     *
+     * @throws IOException if an error occurs.
+     */
+    private void copySingleFileFromDockerContainer(String containerFile, File hostFile, String containerId)
+    throws IOException
+    {
+        boolean copied = false;
+        try (InputStream is = docker.copyArchiveFromContainerCmd(containerId, containerFile).exec();
+             TarArchiveInputStream tis = new TarArchiveInputStream(is))
+        {
+            TarArchiveEntry entry;
+            do
+            {
+                entry = tis.getNextTarEntry();
+                if (entry != null && !entry.isDirectory())
+                {
+                    //Copy the file data to the host filesystem
+                    FileUtils.forceMkdirParent(hostFile);
+                    Files.copy(tis, hostFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    copied = true;
+                }
+            }
+            while (entry != null);
+        }
+
+        if (!copied)
+            throw new FileNotFoundException(containerFile + " not found in container " + containerId);
     }
 
     /**
@@ -237,6 +309,67 @@ public class DockerFileMapper
               .withRemotePath("/") //All paths in TAR are absolute for the container
               .withTarInputStream(sources.getInputStream())
               .exec();
+    }
+
+    /**
+     * Creates an in-memory TAR archive with a single empty directory entry.
+     *
+     * @param directoryPath the directory path to create an entry for.
+     *
+     * @return the created TAR archive.
+     *
+     * @throws IOException if an error occurs.
+     */
+    private SourceTarArchive createEmptyDirectoryTar(String directoryPath)
+    throws IOException
+    {
+        String slashEndedBasePath;
+        if (directoryPath.endsWith("/"))
+            slashEndedBasePath = directoryPath;
+        else
+            slashEndedBasePath = directoryPath + "/";
+
+        ByteArrayOutputStream tarBos = new ByteArrayOutputStream();
+        try (TarArchiveOutputStream tarOs = new TarArchiveOutputStream(tarBos, "UTF-8"))
+        {
+            //TAR library makes anything ending with '/' a directory, so we're guaranteed a directory now
+            TarArchiveEntry tarEntry = new TarArchiveEntry(slashEndedBasePath);
+            tarEntry.setModTime(System.currentTimeMillis());
+            tarOs.putArchiveEntry(tarEntry);
+            tarOs.closeArchiveEntry();
+        }
+
+        return new SourceTarArchive(new ByteArrayInputStream(tarBos.toByteArray()), slashEndedBasePath, new ArrayList<>());
+    }
+
+    /**
+     * Creates an in-memory TAR archive with a single file with a specific name.
+     *
+     * @param file the file to add to the TAR.
+     * @param fileNameInTar the name of the file entry in the TAR.
+     *
+     * @return the created TAR archive.
+     *
+     * @throws IOException if an error occurs.
+     */
+    private SourceTarArchive createTarFromSingleFile(File file, String fileNameInTar)
+    throws IOException
+    {
+        ByteArrayOutputStream tarBos = new ByteArrayOutputStream();
+        try (TarArchiveOutputStream tarOs = new TarArchiveOutputStream(tarBos, "UTF-8"))
+        {
+            TarArchiveEntry tarEntry = new TarArchiveEntry(fileNameInTar);
+            tarEntry.setModTime(file.lastModified());
+            tarEntry.setSize(file.length());
+            tarOs.putArchiveEntry(tarEntry);
+            try (InputStream entryFileIs = new FileInputStream(file))
+            {
+                IOUtils.copy(entryFileIs, tarOs);
+            }
+            tarOs.closeArchiveEntry();
+        }
+
+        return new SourceTarArchive(new ByteArrayInputStream(tarBos.toByteArray()), FilenameUtils.getPath(fileNameInTar), ImmutableList.of(fileNameInTar));
     }
 
     /**
