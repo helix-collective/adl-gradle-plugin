@@ -1,5 +1,8 @@
 package au.com.helixta.adl.gradle.containerexecutor;
 
+import org.gradle.api.file.DirectoryTree;
+import org.gradle.api.file.FileTree;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +44,21 @@ public class PreparedCommandLine
     }
 
     /**
+     * Adds a mapped file tree argument to the command line.  File trees can only be mapped from host to container.  The root directory of the file tree will be used
+     * as the actual argument in the command line string.
+     *
+     * @param hostFileTree the file tree on the host.
+     * @param label the label for the tree.  Used for generating the base directory in the container.
+     *
+     * @return this command line.
+     */
+    public PreparedCommandLine argument(FileTree hostFileTree, String label)
+    {
+        arguments.add(new ContainerFileTree(label, hostFileTree));
+        return this;
+    }
+
+    /**
      * @return a list of all arguments in the command line.
      */
     public List<? extends Argument> getArguments()
@@ -55,6 +73,16 @@ public class PreparedCommandLine
     {
         return arguments.stream()
                         .flatMap(arg -> arg instanceof ContainerFile ? Stream.of((ContainerFile)arg) : Stream.of())
+                        .collect(Collectors.toList());
+    }
+
+    /**
+     * @return a list of all container file tree arguments in the command line.
+     */
+    public List<? extends ContainerFileTree> getContainerFileTreeArguments()
+    {
+        return arguments.stream()
+                        .flatMap(arg -> arg instanceof ContainerFileTree ? Stream.of((ContainerFileTree)arg) : Stream.of())
                         .collect(Collectors.toList());
     }
 
@@ -157,6 +185,63 @@ public class PreparedCommandLine
             if (this == o) return true;
             if (!(o instanceof ContainerFile)) return false;
             ContainerFile that = (ContainerFile) o;
+            return getLabel().equals(that.getLabel());
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(getLabel());
+        }
+    }
+
+    /**
+     * Argument representing a file tree that needs to be mapped from host to container.
+     */
+    public static class ContainerFileTree extends Argument
+    {
+        private final String label;
+        private final FileTree hostFileTree;
+
+        public ContainerFileTree(String label, FileTree hostFileTree)
+        {
+            this.label = Objects.requireNonNull(label);
+            this.hostFileTree = Objects.requireNonNull(hostFileTree);
+        }
+
+        /**
+         * @return a label for the file or directory argument.  Used for generating file names in the container.
+         */
+        public String getLabel()
+        {
+            return label;
+        }
+
+        /**
+         * @return the file tree on the host system.
+         */
+        public FileTree getHostFileTree()
+        {
+            return hostFileTree;
+        }
+
+        public File getHostFileTreeRootDirectory()
+        {
+            //Configurable file trees will implement DirectoryTree
+            if (hostFileTree instanceof DirectoryTree)
+                return ((DirectoryTree)hostFileTree).getDir();
+
+            //Otherwise we have to do this the hard way, though this might result in multiple roots
+            throw new RuntimeException("Could not read root directory from file tree.");
+            //hostFileTree.visit(fileVisitDetails -> fileVisitDetails.getRelativePath()...)
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) return true;
+            if (!(o instanceof ContainerFileTree)) return false;
+            ContainerFileTree that = (ContainerFileTree) o;
             return getLabel().equals(that.getLabel());
         }
 

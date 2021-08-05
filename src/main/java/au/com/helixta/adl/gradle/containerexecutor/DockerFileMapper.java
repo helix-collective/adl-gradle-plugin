@@ -40,7 +40,16 @@ public class DockerFileMapper
     private final ArchiveProcessor archiveProcessor;
 
     private final List<String> mappedCommandLine;
+
+    /**
+     * Container file arguments mapped to their docker container file/directory paths.
+     */
     private final Map<? extends PreparedCommandLine.ContainerFile, String> containerFileMappings;
+
+    /**
+     * Container file tree arguments mapped to their docker container directory paths.
+     */
+    private final Map<? extends PreparedCommandLine.ContainerFileTree, String> containerFileTreeMappings;
 
     public DockerFileMapper(PreparedCommandLine commandLine, String dockerMappedFileBaseDirectory,
                             DockerClient docker, ObjectFactory objectFactory, ArchiveProcessor archiveProcessor)
@@ -58,6 +67,15 @@ public class DockerFileMapper
         }
         this.containerFileMappings = Collections.unmodifiableMap(containerFileMappings);
 
+        //And same for mapped file trees
+        Map<PreparedCommandLine.ContainerFileTree, String> containerFileTreeMappings = new HashMap<>();
+        for (PreparedCommandLine.ContainerFileTree argument : commandLine.getContainerFileTreeArguments())
+        {
+            String mappedDirectory = FilenameUtils.separatorsToUnix(FilenameUtils.concat(dockerMappedFileBaseDirectory, argument.getLabel()));
+            containerFileTreeMappings.put(argument, mappedDirectory);
+        }
+        this.containerFileTreeMappings = Collections.unmodifiableMap(containerFileTreeMappings);
+
         //Generate the command line string including mapped file names
         List<String> mappedCommandLine = new ArrayList<>();
         for (PreparedCommandLine.Argument argument : commandLine.getArguments())
@@ -70,6 +88,13 @@ public class DockerFileMapper
                 String mappedFile = containerFileMappings.get(fileArgument);
                 //Null should never happen since we mapped everything above
                 mappedCommandLine.add(Objects.requireNonNull(mappedFile, "Docker file should have been mapped"));
+            }
+            else if (argument instanceof PreparedCommandLine.ContainerFileTree)
+            {
+                PreparedCommandLine.ContainerFileTree treeArgument = (PreparedCommandLine.ContainerFileTree)argument;
+                String mappedDirectory = containerFileTreeMappings.get(treeArgument);
+                //Null should never happen since we mapped everything above
+                mappedCommandLine.add(Objects.requireNonNull(mappedDirectory, "Docker file tree should have been mapped"));
             }
             else
                 throw new Error("Unknown argument type: " + argument.getClass().getName());
@@ -136,6 +161,19 @@ public class DockerFileMapper
                 {
                     copySourceFilesFromTarToDockerContainer(containerDirectoryTar, dockerContainerId);
                 }
+            }
+        }
+
+        //Also process file trees
+        for (Map.Entry<? extends PreparedCommandLine.ContainerFileTree, String> mappingEntry : containerFileTreeMappings.entrySet())
+        {
+            //All file trees are input only
+            String containerDirectory = mappingEntry.getValue();
+            FileTree dirTree = mappingEntry.getKey().getHostFileTree();
+
+            try (SourceTarArchive containerDirectoryTar = createTarFromFileTree(dirTree, containerDirectory))
+            {
+                copySourceFilesFromTarToDockerContainer(containerDirectoryTar, dockerContainerId);
             }
         }
     }

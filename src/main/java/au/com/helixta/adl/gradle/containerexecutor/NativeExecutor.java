@@ -112,6 +112,8 @@ public class NativeExecutor implements ContainerExecutor
             return ((PreparedCommandLine.StringArgument)argument).getArgument();
         else if (argument instanceof PreparedCommandLine.ContainerFile)
             return ((PreparedCommandLine.ContainerFile)argument).getHostFile().getAbsolutePath();
+        else if (argument instanceof PreparedCommandLine.ContainerFileTree)
+            return ((PreparedCommandLine.ContainerFileTree)argument).getHostFileTreeRootDirectory().getAbsolutePath();
         else
             throw new Error("Unknown argument type: " + argument.getClass().getName());
     }

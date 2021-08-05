@@ -14,6 +14,7 @@ import com.github.dockerjava.transport.DockerHttpClient;
 import com.google.common.collect.ImmutableList;
 import org.gradle.api.Project;
 import org.gradle.api.file.ArchiveOperations;
+import org.gradle.api.file.FileTree;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.testfixtures.ProjectBuilder;
 import org.junit.jupiter.api.AfterAll;
@@ -405,6 +406,114 @@ class TestDockerFileMapper
         assertThat(ioFile).exists();
         List<String> ioFileLines = Files.readAllLines(ioFile);
         assertThat(ioFileLines).contains("One", "Two", "Three", "Added in container");
+    }
+
+    @Test
+    void testCopyInputFileTree(@TempDir Path tempDir)
+    throws IOException, InterruptedException
+    {
+        //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
+        Path dockerBase = tempDir.resolve("dockerbase");
+        Files.createDirectories(dockerBase);
+
+        Path file1 = dockerBase.resolve("galah1.txt");
+        Files.write(file1, ImmutableList.of("This is file content"));
+        Path file2 = dockerBase.resolve("galah2.txt");
+        Files.write(file2, ImmutableList.of("Another file"));
+        Path file3 = dockerBase.resolve("cockatoo1.txt");
+        Files.write(file3, ImmutableList.of("Cockatoo file"));
+
+        //Put a couple of files in dir for copying across
+        FileTree tree = objectFactory.fileTree()
+                                     .from(dockerBase)
+                                     .filter(f -> f.getName().endsWith("1.txt"))
+                                     .getAsFileTree();
+
+        //Generate a command line for ls -a <mydir> which is mapped
+        PreparedCommandLine commandLine = new PreparedCommandLine()
+                .argument("-a")
+                .argument(tree, "mydir");
+        DockerFileMapper mapper = new DockerFileMapper(commandLine, "/data", docker, objectFactory, archiveProcessor);
+
+        List<String> fullCommandLine = mapper.getMappedCommandLineWithProgram("ls");
+
+        //Create a basic Linux container
+        CreateContainerResponse response = docker.createContainerCmd("ubuntu:20.04")
+                                                 .withHostConfig(HostConfig.newHostConfig().withAutoRemove(false))
+                                                 .withName(testDockerContainerName)
+                                                 .withCmd(fullCommandLine)
+                                                 .exec();
+        String containerId = response.getId();
+        createdContainerIds.add(containerId);
+
+        mapper.copyFilesFromHostToContainer(containerId);
+
+        docker.startContainerCmd(containerId).exec();
+
+        WaitContainerResultCallback resultCallback = docker.waitContainerCmd(containerId).start();
+        Integer result = resultCallback.awaitStatusCode();
+        assertThat(result).describedAs("Docker process exit code").isZero();
+        DockerLogCollector dockerLog = new DockerLogCollector();
+        docker.logContainerCmd(containerId).withStdOut(true).exec(dockerLog).awaitCompletion();
+
+        assertThat(dockerLog.getLogContentAsLines()).contains(".", "..", "galah1.txt", "cockatoo1.txt");
+    }
+
+    @Test
+    void testCopyInputFileTreeNestedDirectoryStructure(@TempDir Path tempDir)
+    throws IOException, InterruptedException
+    {
+        //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
+        Path dockerBase = tempDir.resolve("dockerbase");
+        Files.createDirectories(dockerBase);
+
+        Path file1 = dockerBase.resolve("galah1.txt");
+        Files.write(file1, ImmutableList.of("This is file content"));
+        Path subdir = dockerBase.resolve("sub");
+        Files.createDirectories(subdir);
+        Path file2 = subdir.resolve("galah2.txt");
+        Files.write(file2, ImmutableList.of("Another file"));
+        Path file3 = subdir.resolve("cockatoo1.txt");
+        Files.write(file3, ImmutableList.of("Cockatoo file"));
+
+        //Put a couple of files in dir for copying across
+        FileTree tree = objectFactory.fileTree()
+                                     .from(dockerBase)
+                                     .getAsFileTree();
+
+        //Generate a command line for find <mydir> which is mapped
+        PreparedCommandLine commandLine = new PreparedCommandLine()
+                .argument(tree, "mydir");
+        DockerFileMapper mapper = new DockerFileMapper(commandLine, "/data", docker, objectFactory, archiveProcessor);
+
+        List<String> fullCommandLine = mapper.getMappedCommandLineWithProgram("find");
+
+        //Create a basic Linux container
+        CreateContainerResponse response = docker.createContainerCmd("ubuntu:20.04")
+                                                 .withHostConfig(HostConfig.newHostConfig().withAutoRemove(false))
+                                                 .withName(testDockerContainerName)
+                                                 .withCmd(fullCommandLine)
+                                                 .exec();
+        String containerId = response.getId();
+        createdContainerIds.add(containerId);
+
+        mapper.copyFilesFromHostToContainer(containerId);
+
+        docker.startContainerCmd(containerId).exec();
+
+        WaitContainerResultCallback resultCallback = docker.waitContainerCmd(containerId).start();
+        Integer result = resultCallback.awaitStatusCode();
+        assertThat(result).describedAs("Docker process exit code").isZero();
+        DockerLogCollector dockerLog = new DockerLogCollector();
+        docker.logContainerCmd(containerId).withStdOut(true).exec(dockerLog).awaitCompletion();
+
+        //Each line will be an absolute path from the output of the find command
+        assertThat(dockerLog.getLogContentAsLines()).contains(
+                "/data/mydir",
+                "/data/mydir/galah1.txt",
+                "/data/mydir/sub",
+                "/data/mydir/sub/cockatoo1.txt",
+                "/data/mydir/sub/galah2.txt");
     }
 
     /**
