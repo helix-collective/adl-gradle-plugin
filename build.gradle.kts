@@ -59,6 +59,7 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.18.1")
     testImplementation("com.github.javaparser:javaparser-core:3.18.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testImplementation("org.mockito:mockito-junit-jupiter:3.11.2")
 }
 
 tasks {

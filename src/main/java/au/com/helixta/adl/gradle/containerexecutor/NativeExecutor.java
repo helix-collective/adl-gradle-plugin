@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class NativeExecutor implements ContainerExecutor
 {
@@ -102,18 +103,24 @@ public class NativeExecutor implements ContainerExecutor
     {
         return commandLine.getArguments()
                           .stream()
-                          .map(this::argumentToString)
+                          .flatMap(this::argumentToStrings)
                           .collect(Collectors.toList());
     }
 
-    private String argumentToString(PreparedCommandLine.Argument argument)
+    private Stream<String> argumentToStrings(PreparedCommandLine.Argument argument)
     {
         if (argument instanceof PreparedCommandLine.StringArgument)
-            return ((PreparedCommandLine.StringArgument)argument).getArgument();
+            return Stream.of(((PreparedCommandLine.StringArgument)argument).getArgument());
         else if (argument instanceof PreparedCommandLine.ContainerFile)
-            return ((PreparedCommandLine.ContainerFile)argument).getHostFile().getAbsolutePath();
+            return Stream.of(((PreparedCommandLine.ContainerFile)argument).getHostFile().getAbsolutePath());
         else if (argument instanceof PreparedCommandLine.ContainerFileTree)
-            return ((PreparedCommandLine.ContainerFileTree)argument).getHostFileTreeRootDirectory().getAbsolutePath();
+        {
+            List<String> generatedArgs = new ArrayList<>(2);
+            PreparedCommandLine.ContainerFileTree tree = (PreparedCommandLine.ContainerFileTree)argument;
+            generatedArgs.addAll(tree.getCommandLineGenerator().generateFromTree(tree.getHostFileTree(), FileTrees.fileTreeRoots(tree.getHostFileTree()).stream().map(File::getAbsolutePath).collect(Collectors.toList())));
+            tree.getHostFileTree().visit(fileVisitDetails -> generatedArgs.addAll(tree.getCommandLineGenerator().generateFromTreeElement(tree.getHostFileTree(), fileVisitDetails, fileVisitDetails.getFile().getAbsolutePath())));
+            return generatedArgs.stream();
+        }
         else
             throw new Error("Unknown argument type: " + argument.getClass().getName());
     }

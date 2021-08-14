@@ -1,10 +1,11 @@
 package au.com.helixta.adl.gradle.containerexecutor;
 
-import org.gradle.api.file.DirectoryTree;
 import org.gradle.api.file.FileTree;
+import org.gradle.api.file.FileTreeElement;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -44,17 +45,37 @@ public class PreparedCommandLine
     }
 
     /**
-     * Adds a mapped file tree argument to the command line.  File trees can only be mapped from host to container.  The root directory of the file tree will be used
-     * as the actual argument in the command line string.
+     * Adds a mapped file tree argument to the command line with complete control over command line translation and generation.
+     * File trees can only be mapped from host to container.
+     *
+     * @param hostFileTree the file tree on the host.
+     * @param label the label for the tree.  Used for generating the base directory in the container.
+     * @param fileTreeCommandLineGenerator the generator to use for generating command line arguments from file tree elements.
+     *
+     * @return this command line.
+     *
+     * @see #argument(FileTree, String)
+     */
+    public PreparedCommandLine argument(FileTree hostFileTree, String label, FileTreeCommandLineGenerator fileTreeCommandLineGenerator)
+    {
+        arguments.add(new ContainerFileTree(label, hostFileTree, fileTreeCommandLineGenerator));
+        return this;
+    }
+
+    /**
+     * Adds a mapped file tree argument to the command line that expands all file elements from the file tree into string arguments.
+     * File trees can only be mapped from host to container.
      *
      * @param hostFileTree the file tree on the host.
      * @param label the label for the tree.  Used for generating the base directory in the container.
      *
      * @return this command line.
+     *
+     * @see #argument(FileTree, String, FileTreeCommandLineGenerator) 
      */
     public PreparedCommandLine argument(FileTree hostFileTree, String label)
     {
-        arguments.add(new ContainerFileTree(label, hostFileTree));
+        arguments.add(new ContainerFileTree(label, hostFileTree, new SimpleFileCommandLineGenerator()));
         return this;
     }
 
@@ -202,11 +223,13 @@ public class PreparedCommandLine
     {
         private final String label;
         private final FileTree hostFileTree;
+        private final FileTreeCommandLineGenerator commandLineGenerator;
 
-        public ContainerFileTree(String label, FileTree hostFileTree)
+        public ContainerFileTree(String label, FileTree hostFileTree, FileTreeCommandLineGenerator commandLineGenerator)
         {
             this.label = Objects.requireNonNull(label);
             this.hostFileTree = Objects.requireNonNull(hostFileTree);
+            this.commandLineGenerator = Objects.requireNonNull(commandLineGenerator);
         }
 
         /**
@@ -225,15 +248,12 @@ public class PreparedCommandLine
             return hostFileTree;
         }
 
-        public File getHostFileTreeRootDirectory()
+        /**
+         * @return the generator for translating elements from this file tree to actual command line arguments.
+         */
+        public FileTreeCommandLineGenerator getCommandLineGenerator()
         {
-            //Configurable file trees will implement DirectoryTree
-            if (hostFileTree instanceof DirectoryTree)
-                return ((DirectoryTree)hostFileTree).getDir();
-
-            //Otherwise we have to do this the hard way, though this might result in multiple roots
-            throw new RuntimeException("Could not read root directory from file tree.");
-            //hostFileTree.visit(fileVisitDetails -> fileVisitDetails.getRelativePath()...)
+            return commandLineGenerator;
         }
 
         @Override
@@ -287,5 +307,74 @@ public class PreparedCommandLine
          * File is a single file, not a directory.
          */
         SINGLE_FILE;
+    }
+
+    /**
+     * Functional interface to allow complete control over the conversion of elements in a file tree to comand line arguments.
+     */
+    public static interface FileTreeCommandLineGenerator
+    {
+        /**
+         * Translates the file tree itself to command line arguments.  Can be used if only the base directories of the tree are needed to generate arguments.
+         *
+         * @param tree the file tree the element is from.
+         * @param rootContainerPaths the root directories of the file tree mapped to containers.  Typically only one directory, but may be multiple if there are multiple
+         *                           trees joined together.
+         *
+         * @return strings to add to the command line for this element, or an empty list if it should be ignored.
+         */
+        public List<String> generateFromTree(FileTree tree, List<String> rootContainerPaths);
+
+        /**
+         * Translates a single path in a file tree to command line arguments.
+         *
+         * @param tree the file tree the element is from.
+         * @param element the element being processed from the file tree on the host.
+         * @param containerPath the absolute path the element or tree itself has mapped inside the container.  Use this path instead of the one on the host when
+         *                      generating arguments.
+         *
+         * @return strings to add to the command line for this element, or an empty list if it should be ignored.
+         */
+        public List<String> generateFromTreeElement(FileTree tree, FileTreeElement element, String containerPath);
+    }
+
+    /**
+     * Translates files and not directories to string command line arguments without any prefix or suffix arguments.
+     */
+    public static class SimpleFileCommandLineGenerator implements FileTreeCommandLineGenerator
+    {
+        @Override
+        public List<String> generateFromTree(FileTree tree, List<String> rootContainerPaths)
+        {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<String> generateFromTreeElement(FileTree tree, FileTreeElement element, String containerPath)
+        {
+            if (element.isDirectory())
+                return Collections.emptyList();
+
+            return Collections.singletonList(containerPath);
+        }
+    }
+
+    /**
+     * Uses the base directory of the file tree as a single string argument.  Not all file trees have a single root, so be careful with this as it might not work everywhere.
+     * Throws an exception if there are multiple or no roots in the tree.
+     */
+    public static class SingleBaseDirectoryCommandLineGenerator implements FileTreeCommandLineGenerator
+    {
+        @Override
+        public List<String> generateFromTree(FileTree tree, List<String> rootContainerPaths)
+        {
+            return rootContainerPaths;
+        }
+
+        @Override
+        public List<String> generateFromTreeElement(FileTree tree, FileTreeElement element, String containerPath)
+        {
+            return Collections.emptyList();
+        }
     }
 }

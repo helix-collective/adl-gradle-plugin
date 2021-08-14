@@ -76,6 +76,16 @@ class TestDockerFileMapper
     }
 
     /**
+     * Due to a pretty bad bug in JUnit5, sometimes tempdirs get reused across tests despite the doco explicitly saying this is not the case.
+     * So generate unique file names for each test to work around this nonsense.
+     */
+    private static Path createDockerBaseDirectory(Path root)
+    throws IOException
+    {
+        return Files.createTempDirectory(root, "dockerbase");
+    }
+
+    /**
      * Purely for exercising Gradle's injection system to get objects.
      */
     public static class InjectReceiver
@@ -133,8 +143,7 @@ class TestDockerFileMapper
     throws IOException, InterruptedException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         //Put a couple of files in dir for copying across
         Path file1 = dockerBase.resolve("galah1.txt");
@@ -180,8 +189,7 @@ class TestDockerFileMapper
     throws IOException, InterruptedException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         //Put a couple of files in dir for copying across
         Path file1 = dockerBase.resolve("galah1.txt");
@@ -226,8 +234,7 @@ class TestDockerFileMapper
     throws IOException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         //Generate a command line for cp /etc/shells <mydir> which is mapped
         PreparedCommandLine commandLine = new PreparedCommandLine()
@@ -271,8 +278,7 @@ class TestDockerFileMapper
     throws IOException, InterruptedException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         //A single file to copy across
         Path inputFile = dockerBase.resolve("galah1.txt");
@@ -315,8 +321,7 @@ class TestDockerFileMapper
     throws IOException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         Path shellsFile = dockerBase.resolve("shellsfile.txt");
 
@@ -361,10 +366,9 @@ class TestDockerFileMapper
     throws IOException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
+        Path dockerBase = createDockerBaseDirectory(tempDir);
         Path scriptFile = dockerBase.resolve("myscript.sh");
         Path ioFile = dockerBase.resolve("thefile.txt");
-        Files.createDirectories(dockerBase);
 
         //Prepare script
         String scriptContent =
@@ -409,12 +413,11 @@ class TestDockerFileMapper
     }
 
     @Test
-    void testCopyInputFileTree(@TempDir Path tempDir)
+    void copyInputFileTreeUsingBaseDirectory(@TempDir Path tempDir)
     throws IOException, InterruptedException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         Path file1 = dockerBase.resolve("galah1.txt");
         Files.write(file1, ImmutableList.of("This is file content"));
@@ -432,7 +435,7 @@ class TestDockerFileMapper
         //Generate a command line for ls -a <mydir> which is mapped
         PreparedCommandLine commandLine = new PreparedCommandLine()
                 .argument("-a")
-                .argument(tree, "mydir");
+                .argument(tree, "mydir", new PreparedCommandLine.SingleBaseDirectoryCommandLineGenerator());
         DockerFileMapper mapper = new DockerFileMapper(commandLine, "/data", docker, objectFactory, archiveProcessor);
 
         List<String> fullCommandLine = mapper.getMappedCommandLineWithProgram("ls");
@@ -460,12 +463,11 @@ class TestDockerFileMapper
     }
 
     @Test
-    void testCopyInputFileTreeNestedDirectoryStructure(@TempDir Path tempDir)
+    void copyInputFileTreeNestedDirectoryStructureUsingBaseDirectory(@TempDir Path tempDir)
     throws IOException, InterruptedException
     {
         //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
-        Path dockerBase = tempDir.resolve("dockerbase");
-        Files.createDirectories(dockerBase);
+        Path dockerBase = createDockerBaseDirectory(tempDir);
 
         Path file1 = dockerBase.resolve("galah1.txt");
         Files.write(file1, ImmutableList.of("This is file content"));
@@ -483,7 +485,7 @@ class TestDockerFileMapper
 
         //Generate a command line for find <mydir> which is mapped
         PreparedCommandLine commandLine = new PreparedCommandLine()
-                .argument(tree, "mydir");
+                .argument(tree, "mydir", new PreparedCommandLine.SingleBaseDirectoryCommandLineGenerator());
         DockerFileMapper mapper = new DockerFileMapper(commandLine, "/data", docker, objectFactory, archiveProcessor);
 
         List<String> fullCommandLine = mapper.getMappedCommandLineWithProgram("find");
@@ -514,6 +516,106 @@ class TestDockerFileMapper
                 "/data/mydir/sub",
                 "/data/mydir/sub/cockatoo1.txt",
                 "/data/mydir/sub/galah2.txt");
+    }
+
+    @Test
+    void copyInputFileTreeUsingMultipleArguments(@TempDir Path tempDir)
+    throws IOException, InterruptedException
+    {
+        //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
+        Path dockerBase = createDockerBaseDirectory(tempDir);
+
+        Path file1 = dockerBase.resolve("galah1.txt");
+        Files.write(file1, ImmutableList.of("This is file content"));
+        Path file2 = dockerBase.resolve("galah2.txt");
+        Files.write(file2, ImmutableList.of("Another file"));
+        Path file3 = dockerBase.resolve("cockatoo1.txt");
+        Files.write(file3, ImmutableList.of("Cockatoo file"));
+
+        //Put a couple of files in dir for copying across
+        FileTree tree = objectFactory.fileTree()
+                                     .from(dockerBase)
+                                     .filter(f -> f.getName().endsWith("1.txt"))
+                                     .getAsFileTree();
+
+        //Generate a command line for cat <files...> which is mapped
+        PreparedCommandLine commandLine = new PreparedCommandLine()
+                .argument(tree, "mydir");
+        DockerFileMapper mapper = new DockerFileMapper(commandLine, "/data", docker, objectFactory, archiveProcessor);
+
+        List<String> fullCommandLine = mapper.getMappedCommandLineWithProgram("cat");
+
+        //Create a basic Linux container
+        CreateContainerResponse response = docker.createContainerCmd("ubuntu:20.04")
+                                                 .withHostConfig(HostConfig.newHostConfig().withAutoRemove(false))
+                                                 .withName(testDockerContainerName)
+                                                 .withCmd(fullCommandLine)
+                                                 .exec();
+        String containerId = response.getId();
+        createdContainerIds.add(containerId);
+
+        mapper.copyFilesFromHostToContainer(containerId);
+
+        docker.startContainerCmd(containerId).exec();
+
+        WaitContainerResultCallback resultCallback = docker.waitContainerCmd(containerId).start();
+        Integer result = resultCallback.awaitStatusCode();
+        assertThat(result).describedAs("Docker process exit code").isZero();
+        DockerLogCollector dockerLog = new DockerLogCollector();
+        docker.logContainerCmd(containerId).withStdOut(true).exec(dockerLog).awaitCompletion();
+
+        //3rd file is ignored in the file tree filter
+        assertThat(dockerLog.getLogContentAsLines()).containsExactlyInAnyOrder("Cockatoo file", "This is file content");
+    }
+
+    @Test
+    void copyInputFileTreeNestedDirectoryStructureUsingMultipleArguments(@TempDir Path tempDir)
+    throws IOException, InterruptedException
+    {
+        //The directory all our transferred files will come from - don't use tempDir directly because it is also being used for Gradle fake project dir
+        Path dockerBase = createDockerBaseDirectory(tempDir);
+
+        Path file1 = dockerBase.resolve("galah1.txt");
+        Files.write(file1, ImmutableList.of("This is file content"));
+        Path subdir = dockerBase.resolve("sub");
+        Files.createDirectories(subdir);
+        Path file2 = subdir.resolve("galah2.txt");
+        Files.write(file2, ImmutableList.of("Another file"));
+        Path file3 = subdir.resolve("cockatoo1.txt");
+        Files.write(file3, ImmutableList.of("Cockatoo file"));
+
+        //Put a couple of files in dir for copying across
+        FileTree tree = objectFactory.fileTree()
+                                     .from(dockerBase)
+                                     .getAsFileTree();
+
+        //Generate a command line for cat <files...> which is mapped
+        PreparedCommandLine commandLine = new PreparedCommandLine()
+                .argument(tree, "mydir");
+        DockerFileMapper mapper = new DockerFileMapper(commandLine, "/data", docker, objectFactory, archiveProcessor);
+
+        List<String> fullCommandLine = mapper.getMappedCommandLineWithProgram("cat");
+
+        //Create a basic Linux container
+        CreateContainerResponse response = docker.createContainerCmd("ubuntu:20.04")
+                                                 .withHostConfig(HostConfig.newHostConfig().withAutoRemove(false))
+                                                 .withName(testDockerContainerName)
+                                                 .withCmd(fullCommandLine)
+                                                 .exec();
+        String containerId = response.getId();
+        createdContainerIds.add(containerId);
+
+        mapper.copyFilesFromHostToContainer(containerId);
+
+        docker.startContainerCmd(containerId).exec();
+
+        WaitContainerResultCallback resultCallback = docker.waitContainerCmd(containerId).start();
+        Integer result = resultCallback.awaitStatusCode();
+        assertThat(result).describedAs("Docker process exit code").isZero();
+        DockerLogCollector dockerLog = new DockerLogCollector();
+        docker.logContainerCmd(containerId).withStdOut(true).exec(dockerLog).awaitCompletion();
+
+        assertThat(dockerLog.getLogContentAsLines()).containsExactlyInAnyOrder("Cockatoo file", "This is file content", "Another file");
     }
 
     /**

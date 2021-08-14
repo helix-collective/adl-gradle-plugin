@@ -71,8 +71,9 @@ public class DockerFileMapper
         Map<PreparedCommandLine.ContainerFileTree, String> containerFileTreeMappings = new HashMap<>();
         for (PreparedCommandLine.ContainerFileTree argument : commandLine.getContainerFileTreeArguments())
         {
-            String mappedDirectory = FilenameUtils.separatorsToUnix(FilenameUtils.concat(dockerMappedFileBaseDirectory, argument.getLabel()));
-            containerFileTreeMappings.put(argument, mappedDirectory);
+            //Even though a tree might have multiple roots, when we copy to container the tree has a single base directory so a single root in the container
+            String mappedTreeBaseDirectory = FilenameUtils.separatorsToUnix(FilenameUtils.concat(dockerMappedFileBaseDirectory, argument.getLabel()));
+            containerFileTreeMappings.put(argument, mappedTreeBaseDirectory);
         }
         this.containerFileTreeMappings = Collections.unmodifiableMap(containerFileTreeMappings);
 
@@ -92,9 +93,15 @@ public class DockerFileMapper
             else if (argument instanceof PreparedCommandLine.ContainerFileTree)
             {
                 PreparedCommandLine.ContainerFileTree treeArgument = (PreparedCommandLine.ContainerFileTree)argument;
-                String mappedDirectory = containerFileTreeMappings.get(treeArgument);
-                //Null should never happen since we mapped everything above
-                mappedCommandLine.add(Objects.requireNonNull(mappedDirectory, "Docker file tree should have been mapped"));
+                String mappedTreeBaseDirectory = containerFileTreeMappings.get(treeArgument);
+                List<String> baseArgs = treeArgument.getCommandLineGenerator().generateFromTree(treeArgument.getHostFileTree(), Collections.singletonList(mappedTreeBaseDirectory));
+                mappedCommandLine.addAll(baseArgs);
+                treeArgument.getHostFileTree().visit(fileVisitDetails ->
+                {
+                    String containerPath = FilenameUtils.separatorsToUnix(FilenameUtils.concat(mappedTreeBaseDirectory, fileVisitDetails.getRelativePath().getPathString()));
+                    List<String> curArgs = treeArgument.getCommandLineGenerator().generateFromTreeElement(treeArgument.getHostFileTree(), fileVisitDetails, containerPath);
+                    mappedCommandLine.addAll(curArgs);
+                });
             }
             else
                 throw new Error("Unknown argument type: " + argument.getClass().getName());
