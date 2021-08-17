@@ -1,7 +1,9 @@
 package au.com.helixta.adl.gradle.containerexecutor;
 
+import org.gradle.api.file.Directory;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.file.FileTreeElement;
+import org.gradle.api.file.RegularFile;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -30,18 +32,96 @@ public class PreparedCommandLine
     }
 
     /**
-     * Adds a mapped file argument to the command line.  When used, file arguments are mapped into the container.
+     * Adds a mapped file argument to the command line with no prefix or suffix.  When used, file arguments are mapped into the container.
      *
      * @param hostFile the file or directory on the host.
      * @param label a label for the file or directory argument.  Used for generating file names in the container.
      * @param fileTransferMode determines how and when the file will be updated between host and container.
+     * @param fileType if the file should be treated as a single file or a directory.
      *
      * @return this command line.
      */
     public PreparedCommandLine argument(File hostFile, String label, FileTransferMode fileTransferMode, FileType fileType)
     {
-        arguments.add(new ContainerFile(label, hostFile, fileTransferMode, fileType));
+        return argument(hostFile, label, fileTransferMode, fileType, containerPath -> containerPath);
+    }
+
+    /**
+     * Adds a mapped file argument to the command line with a custom generator.  This can be used for generating command line arguments from mapped paths with
+     * prefixes and suffixes.  When used, file arguments are mapped into the container.
+     *
+     * @param hostFile the file or directory on the host.
+     * @param label a label for the file or directory argument.  Used for generating file names in the container.
+     * @param fileTransferMode determines how and when the file will be updated between host and container.
+     * @param fileType if the file should be treated as a single file or a directory.
+     * @param generator controls how the mapped container file is mapped into a command line argument string.
+     *
+     * @return this command line.
+     */
+    public PreparedCommandLine argument(File hostFile, String label, FileTransferMode fileTransferMode, FileType fileType, FileCommandLineGenerator generator)
+    {
+        arguments.add(new ContainerFile(label, hostFile, fileTransferMode, fileType, generator));
         return this;
+    }
+
+    /**
+     * Adds a mapped directory argument to the command line with no prefix or suffix.  When used, directory arguments are mapped into the container.
+     *
+     * @param hostDirectory the directory on the host.
+     * @param label a label for the directory argument.  Used for generating file names in the container.
+     * @param fileTransferMode determines how and when the file will be updated between host and container.
+     *
+     * @return this command line.
+     */
+    public PreparedCommandLine argument(Directory hostDirectory, String label, FileTransferMode fileTransferMode)
+    {
+        return argument(hostDirectory.getAsFile(), label, fileTransferMode, FileType.DIRECTORY);
+    }
+
+    /**
+     * Adds a mapped directory argument to the command line with a custom generator.  This can be used for generating command line arguments from mapped paths with
+     * prefixes and suffixes.  When used, directory arguments are mapped into the container.
+     *
+     * @param hostDirectory the directory on the host.
+     * @param label a label for the directory argument.  Used for generating file names in the container.
+     * @param fileTransferMode determines how and when the file will be updated between host and container.
+     * @param generator controls how the mapped container file is mapped into a command line argument string.
+     *
+     * @return this command line.
+     */
+    public PreparedCommandLine argument(Directory hostDirectory, String label, FileTransferMode fileTransferMode, FileCommandLineGenerator generator)
+    {
+        return argument(hostDirectory.getAsFile(), label, fileTransferMode, FileType.DIRECTORY, generator);
+    }
+
+    /**
+     * Adds a mapped regular file argument to the command line with no prefix or suffix.  When used, file arguments are mapped into the container.
+     *
+     * @param hostFile the file on the host.
+     * @param label a label for the file argument.  Used for generating file names in the container.
+     * @param fileTransferMode determines how and when the file will be updated between host and container.
+     *
+     * @return this command line.
+     */
+    public PreparedCommandLine argument(RegularFile hostFile, String label, FileTransferMode fileTransferMode)
+    {
+        return argument(hostFile.getAsFile(), label, fileTransferMode, FileType.SINGLE_FILE);
+    }
+
+    /**
+     * Adds a mapped regular file argument to the command line with a custom generator.  This can be used for generating command line arguments from mapped paths with
+     * prefixes and suffixes.  When used, file arguments are mapped into the container.
+     *
+     * @param hostFile the file on the host.
+     * @param label a label for the file argument.  Used for generating file names in the container.
+     * @param fileTransferMode determines how and when the file will be updated between host and container.
+     * @param generator controls how the mapped container file is mapped into a command line argument string.
+     *
+     * @return this command line.
+     */
+    public PreparedCommandLine argument(RegularFile hostFile, String label, FileTransferMode fileTransferMode, FileCommandLineGenerator generator)
+    {
+        return argument(hostFile.getAsFile(), label, fileTransferMode, FileType.SINGLE_FILE, generator);
     }
 
     /**
@@ -159,13 +239,15 @@ public class PreparedCommandLine
         private final File hostFile;
         private final FileTransferMode fileTransferMode;
         private final FileType fileType;
+        private final FileCommandLineGenerator commandLineGenerator;
 
-        public ContainerFile(String label, File hostFile, FileTransferMode fileTransferMode, FileType fileType)
+        public ContainerFile(String label, File hostFile, FileTransferMode fileTransferMode, FileType fileType, FileCommandLineGenerator commandLineGenerator)
         {
             this.label = Objects.requireNonNull(label);
             this.hostFile = Objects.requireNonNull(hostFile);
             this.fileTransferMode = Objects.requireNonNull(fileTransferMode);
             this.fileType = Objects.requireNonNull(fileType);
+            this.commandLineGenerator = Objects.requireNonNull(commandLineGenerator);
         }
 
         /**
@@ -198,6 +280,14 @@ public class PreparedCommandLine
         public FileType getFileType()
         {
             return fileType;
+        }
+
+        /**
+         * @return the generator to use for generating command line argument strings from container paths.
+         */
+        public FileCommandLineGenerator getCommandLineGenerator()
+        {
+            return commandLineGenerator;
         }
 
         @Override
@@ -310,7 +400,24 @@ public class PreparedCommandLine
     }
 
     /**
-     * Functional interface to allow complete control over the conversion of elements in a file tree to comand line arguments.
+     * Interface to allow control over generation of a single command line argument from a file.  Allows string prefixes and suffixes to be added to
+     * container-generated file names.
+     */
+    @FunctionalInterface
+    public static interface FileCommandLineGenerator
+    {
+        /**
+         * Generates a command line argument from a container path mapped from a host file or directory.
+         *
+         * @param containerPath the path of the file or directory in the container.
+         *
+         * @return a command line argument string.  Should incorporate the container path.
+         */
+        public String generate(String containerPath);
+    }
+
+    /**
+     * Interface to allow complete control over the conversion of elements in a file tree to command line arguments.
      */
     public static interface FileTreeCommandLineGenerator
     {

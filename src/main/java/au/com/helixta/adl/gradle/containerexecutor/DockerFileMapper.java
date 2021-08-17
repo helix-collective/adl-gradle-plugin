@@ -86,9 +86,9 @@ public class DockerFileMapper
             else if (argument instanceof PreparedCommandLine.ContainerFile)
             {
                 PreparedCommandLine.ContainerFile fileArgument = (PreparedCommandLine.ContainerFile)argument;
-                String mappedFile = containerFileMappings.get(fileArgument);
-                //Null should never happen since we mapped everything above
-                mappedCommandLine.add(Objects.requireNonNull(mappedFile, "Docker file should have been mapped"));
+                String mappedFile = Objects.requireNonNull(containerFileMappings.get(fileArgument), "Docker file should have been mapped");
+                String argumentString = fileArgument.getCommandLineGenerator().generate(mappedFile);
+                mappedCommandLine.add(argumentString);
             }
             else if (argument instanceof PreparedCommandLine.ContainerFileTree)
             {

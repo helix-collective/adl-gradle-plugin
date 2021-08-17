@@ -112,7 +112,11 @@ public class NativeExecutor implements ContainerExecutor
         if (argument instanceof PreparedCommandLine.StringArgument)
             return Stream.of(((PreparedCommandLine.StringArgument)argument).getArgument());
         else if (argument instanceof PreparedCommandLine.ContainerFile)
-            return Stream.of(((PreparedCommandLine.ContainerFile)argument).getHostFile().getAbsolutePath());
+        {
+            PreparedCommandLine.ContainerFile containerFile = (PreparedCommandLine.ContainerFile)argument;
+            String stringArgument = containerFile.getCommandLineGenerator().generate(containerFile.getHostFile().getAbsolutePath());
+            return Stream.of(stringArgument);
+        }
         else if (argument instanceof PreparedCommandLine.ContainerFileTree)
         {
             List<String> generatedArgs = new ArrayList<>(2);
