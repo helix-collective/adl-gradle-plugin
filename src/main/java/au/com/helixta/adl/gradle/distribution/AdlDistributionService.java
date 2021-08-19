@@ -21,7 +21,10 @@ public class AdlDistributionService extends AbstractDistributionService
     @Override
     protected DownloadParameters specifierToDownloadParameters(DistributionSpecifier specifier)
     {
-        return new DownloadParameters("adl-bindist", specToClassifier(specifier), "zip");
+        String classifier = specToClassifier(specifier);
+        if (classifier == null)
+            return null;
+        return new DownloadParameters("adl-bindist", classifier, "zip");
     }
 
     /**
