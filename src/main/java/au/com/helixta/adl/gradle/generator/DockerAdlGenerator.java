@@ -13,6 +13,7 @@ import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.async.ResultCallbackTemplate;
 import com.github.dockerjava.api.command.BuildImageResultCallback;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.InspectImageResponse;
 import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.exception.DockerException;
@@ -20,7 +21,6 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.BuildResponseItem;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
-import com.github.dockerjava.api.model.Image;
 import com.github.dockerjava.api.model.PullResponseItem;
 import com.github.dockerjava.api.model.StreamType;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
@@ -58,7 +58,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -258,17 +257,30 @@ public class DockerAdlGenerator implements AdlGenerator
     private boolean checkPullDockerImage(String imageName)
     throws AdlGenerationException
     {
-        List<Image> images = docker.listImagesCmd().withImageNameFilter(imageName).exec();
+        //Do not use withImageNameFilter() it won't work on later Docker versions
+        //and will act like the filter isn't even there (and we delete afterwards!)
+        //See: https://github.com/docker-java/docker-java/issues/1523
+        //https://github.com/testcontainers/testcontainers-java/pull/3575
+        //List<Image> images = docker.listImagesCmd().withImageNameFilter(imageName).exec();
 
-        //There should really only be zero or one iamges in the list since it's an exact image name match
+        InspectImageResponse existingImage;
+        try
+        {
+            existingImage = docker.inspectImageCmd(imageName).exec();
+        }
+        catch (NotFoundException e)
+        {
+            //Image does not exist, that's fine
+            existingImage = null;
+        }
 
         //Forced rebuild - delete any existing local image
         if (dockerConfiguration.getImageBuildMode() == ImageBuildMode.REBUILD)
         {
-            for (Image image : images)
+            if (existingImage != null && existingImage.getId() != null)
             {
-                log.info("Image build mode is " + dockerConfiguration.getImageBuildMode() + ", removing existing ADL Docker image " + image.getId());
-                docker.removeImageCmd(image.getId()).exec();
+                log.info("Image build mode is " + dockerConfiguration.getImageBuildMode() + ", removing existing ADL Docker image " + existingImage.getId() + " " + existingImage.getRepoTags());
+                docker.removeImageCmd(existingImage.getId()).exec();
             }
             return false; //return false so that image will always be rebuilt locally
         }
@@ -276,19 +288,15 @@ public class DockerAdlGenerator implements AdlGenerator
         //Rebuild only if previous image is local - and allow re-pull from remotes
         else if (dockerConfiguration.getImageBuildMode() == ImageBuildMode.DISCARD_LOCAL)
         {
-            for (Iterator<Image> i = images.iterator(); i.hasNext();)
+            if (existingImage != null && existingImage.getId() != null && dockerImageIsGeneratedLocally(existingImage))
             {
-                Image image = i.next();
-                if (dockerImageIsGeneratedLocally(image))
-                {
-                    log.info("Image build mode is " + dockerConfiguration.getImageBuildMode() + ", removing existing locally generated ADL Docker image " + image.getId());
-                    docker.removeImageCmd(image.getId()).exec();
-                    i.remove();
-                }
+                log.info("Image build mode is " + dockerConfiguration.getImageBuildMode() + ", removing existing locally generated ADL Docker image " + existingImage.getId() + " " + existingImage.getRepoTags());
+                docker.removeImageCmd(existingImage.getId()).exec();
+                existingImage = null;
             }
         }
 
-        if (images.isEmpty())
+        if (existingImage == null)
             return pullDockerImage(imageName);
         else
             return true;
@@ -301,9 +309,11 @@ public class DockerAdlGenerator implements AdlGenerator
      *
      * @return true if the Docker image was generated locally, false if not.
      */
-    protected boolean dockerImageIsGeneratedLocally(Image image)
+    protected boolean dockerImageIsGeneratedLocally(InspectImageResponse image)
     {
-        return image.getLabels() != null && image.getLabels().get(DOCKER_ADL_GENERATOR_LABEL) != null;
+        return image.getConfig() != null
+                && image.getConfig().getLabels() != null
+                && image.getConfig().getLabels().get(DOCKER_ADL_GENERATOR_LABEL) != null;
     }
 
     /**
