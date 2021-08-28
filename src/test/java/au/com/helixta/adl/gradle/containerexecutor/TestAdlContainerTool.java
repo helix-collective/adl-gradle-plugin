@@ -8,11 +8,7 @@ import au.com.helixta.adl.gradle.distribution.DistributionNotFoundException;
 import au.com.helixta.adl.gradle.generator.AdlToolLogger;
 import au.com.helixta.adl.gradle.generator.ArchiveProcessor;
 import au.com.helixta.adl.gradle.generator.SimpleAdlToolLogger;
-import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
-import com.github.dockerjava.core.DockerClientImpl;
-import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
-import com.github.dockerjava.transport.DockerHttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileCollection;
@@ -24,7 +20,6 @@ import org.gradle.initialization.GradleUserHomeDirProvider;
 import org.gradle.nativeplatform.TargetMachineFactory;
 import org.gradle.process.ExecOperations;
 import org.gradle.testfixtures.ProjectBuilder;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,7 +35,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class TestAdlContainerTool
 {
-    private static DockerClient docker;
+    private static DockerClientFactory dockerFactory;
     private static ObjectFactory objectFactory;
     private static ArchiveProcessor archiveProcessor;
     private static ExecOperations execOperations;
@@ -55,12 +50,7 @@ class TestAdlContainerTool
     private static void setUpDocker()
     {
         DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
-        DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
-                .dockerHost(config.getDockerHost())
-                .sslConfig(config.getSSLConfig())
-                .build();
-
-        docker = DockerClientImpl.getInstance(config, httpClient);
+        dockerFactory = new DockerClientFactory(config);
     }
 
     @BeforeAll
@@ -77,14 +67,6 @@ class TestAdlContainerTool
         gradleUserHomeDirProvider = injectReceiver.gradleUserHomeDirProvider;
         fileSystemOperations = injectReceiver.fileSystemOperations;
         project = p;
-    }
-
-    @AfterAll
-    private static void closeDocker()
-    throws IOException
-    {
-        if (docker != null)
-            docker.close();
     }
 
     /**
@@ -131,7 +113,7 @@ class TestAdlContainerTool
 
         //Tool setup
         AdlToolLogger toolLog = new SimpleAdlToolLogger(gradleLogger);
-        ContainerTool.Environment env = new ContainerTool.Environment(execOperations, toolLog, docker, targetMachineFactory, objectFactory, archiveOperations, archiveProcessor, gradleUserHomeDirProvider, fileSystemOperations, project, gradleLogger);
+        ContainerTool.Environment env = new ContainerTool.Environment(execOperations, toolLog, dockerFactory, targetMachineFactory, objectFactory, archiveOperations, archiveProcessor, gradleUserHomeDirProvider, fileSystemOperations, project, gradleLogger);
         AdlContainerTool tool = new AdlContainerTool(env);
 
         AdlConfiguration adl = new AdlConfiguration()

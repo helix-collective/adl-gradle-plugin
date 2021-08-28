@@ -99,7 +99,7 @@ public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConf
             commandLine.argument("--header-comment=" + generation.getHeaderComment());
 
         if (generation.getManifest().isPresent())
-            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT);
+            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT, containerPath -> "--manifest=" + containerPath);
 
         generation.getCompilerArgs().forEach(commandLine::argument);
 
@@ -145,7 +145,7 @@ public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConf
             commandLine.argument("--runtime-dir=" + generation.getRuntimeModuleName());
 
         if (generation.getManifest().isPresent())
-            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT);
+            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT, containerPath -> "--manifest=" + containerPath);
 
         generation.getCompilerArgs().forEach(commandLine::argument);
 
@@ -179,7 +179,7 @@ public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConf
             commandLine.argument("--verbose");
 
         if (generation.getManifest().isPresent())
-            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT);
+            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT, containerPath -> "--manifest=" + containerPath);
 
         generation.getCompilerArgs().forEach(commandLine::argument);
 

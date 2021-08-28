@@ -56,14 +56,17 @@ public abstract class ContainerTool<C>
     {
         Objects.requireNonNull(config);
 
-        DockerExecutor dockerExecutor = new DockerExecutor(environment.dockerClient, staticToolConfiguration.distributionService, staticToolConfiguration.executableResolver,
-                                                           staticToolConfiguration.dockerToolInstallBaseDirectory, staticToolConfiguration.dockerMappedBaseDirectory,
-                                                           readDistributionVersion(config), staticToolConfiguration.baseDockerImageName,
-                                                           staticToolConfiguration.baseDockerContainerName, readDockerConfiguration(config), environment.toolLogger,
-                                                           staticToolConfiguration.logToolName, environment.targetMachineFactory, environment.objectFactory,
-                                                           environment.archiveOperations, environment.archiveProcessor);
-        PreparedCommandLine commandLine = createCommandLine(config);
-        dockerExecutor.execute(commandLine);
+        try (DockerClient dockerClient = environment.dockerClientFactory.createDockerClient())
+        {
+            DockerExecutor dockerExecutor = new DockerExecutor(dockerClient, staticToolConfiguration.distributionService, staticToolConfiguration.executableResolver,
+                                                               staticToolConfiguration.dockerToolInstallBaseDirectory, staticToolConfiguration.dockerMappedBaseDirectory,
+                                                               readDistributionVersion(config), staticToolConfiguration.baseDockerImageName,
+                                                               staticToolConfiguration.baseDockerContainerName, readDockerConfiguration(config), environment.toolLogger,
+                                                               staticToolConfiguration.logToolName, environment.targetMachineFactory, environment.objectFactory,
+                                                               environment.archiveOperations, environment.archiveProcessor);
+            PreparedCommandLine commandLine = createCommandLine(config);
+            dockerExecutor.execute(commandLine);
+        }
     }
 
     public void execute(C config, ExecutionPlatform platform)
@@ -108,11 +111,11 @@ public abstract class ContainerTool<C>
     protected abstract String readDistributionVersion(C config);
     protected abstract DockerConfiguration readDockerConfiguration(C config);
 
-    protected static class Environment
+    public static class Environment
     {
         private final ExecOperations execOperations;
         private final AdlToolLogger toolLogger;
-        private final DockerClient dockerClient;
+        private final DockerClientFactory dockerClientFactory;
         private final TargetMachineFactory targetMachineFactory;
         private final ObjectFactory objectFactory;
         private final ArchiveOperations archiveOperations;
@@ -122,14 +125,14 @@ public abstract class ContainerTool<C>
         private final Project project;
         private final Logger gradleLogger;
 
-        public Environment(ExecOperations execOperations, AdlToolLogger toolLogger, DockerClient dockerClient, TargetMachineFactory targetMachineFactory,
+        public Environment(ExecOperations execOperations, AdlToolLogger toolLogger, DockerClientFactory dockerClientFactory, TargetMachineFactory targetMachineFactory,
                            ObjectFactory objectFactory, ArchiveOperations archiveOperations, ArchiveProcessor archiveProcessor,
                            GradleUserHomeDirProvider homeDirProvider, FileSystemOperations fileSystemOperations, Project project,
                            Logger gradleLogger)
         {
             this.execOperations = Objects.requireNonNull(execOperations);
             this.toolLogger = Objects.requireNonNull(toolLogger);
-            this.dockerClient = Objects.requireNonNull(dockerClient);
+            this.dockerClientFactory = Objects.requireNonNull(dockerClientFactory);
             this.targetMachineFactory = Objects.requireNonNull(targetMachineFactory);
             this.objectFactory = Objects.requireNonNull(objectFactory);
             this.archiveOperations = Objects.requireNonNull(archiveOperations);
@@ -150,9 +153,9 @@ public abstract class ContainerTool<C>
             return toolLogger;
         }
 
-        public DockerClient getDockerClient()
+        public DockerClientFactory getDockerClientFactory()
         {
-            return dockerClient;
+            return dockerClientFactory;
         }
 
         public TargetMachineFactory getTargetMachineFactory()

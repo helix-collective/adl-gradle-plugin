@@ -18,5 +18,5 @@ public enum AdlPlatform
     /**
      * Run ADL using a Docker container.  Requires Docker to be available.
      */
-    DOCKER
+    DOCKER;
 }

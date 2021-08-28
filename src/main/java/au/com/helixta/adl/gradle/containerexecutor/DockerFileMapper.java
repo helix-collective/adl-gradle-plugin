@@ -163,8 +163,15 @@ public class DockerFileMapper
             //For output-only files, only generate empty directories
             else if (mappingEntry.getKey().getFileMode() == PreparedCommandLine.FileTransferMode.OUTPUT)
             {
-                String containerDirectory = mappingEntry.getValue();
-                try (SourceTarArchive containerDirectoryTar = createEmptyDirectoryTar(containerDirectory))
+                String containerFileOrDirectory = mappingEntry.getValue();
+
+                if (mappingEntry.getKey().getFileType() == PreparedCommandLine.FileType.SINGLE_FILE)
+                {
+                    //For single file output-only only create the parent directory
+                    containerFileOrDirectory = FilenameUtils.getFullPathNoEndSeparator(containerFileOrDirectory);
+                }
+
+                try (SourceTarArchive containerDirectoryTar = createEmptyDirectoryTar(containerFileOrDirectory))
                 {
                     copySourceFilesFromTarToDockerContainer(containerDirectoryTar, dockerContainerId);
                 }
