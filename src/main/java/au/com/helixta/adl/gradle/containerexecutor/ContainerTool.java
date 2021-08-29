@@ -45,8 +45,10 @@ public abstract class ContainerTool<C>
 
         DistributionSpecifier distributionSpecifier = nativeDistributionSpecifier(readDistributionVersion(config));
 
-        NativeExecutor nativeExecutor = new NativeExecutor(staticToolConfiguration.distributionService, distributionSpecifier, staticToolConfiguration.executableResolver, environment.execOperations,
-                                                           environment.toolLogger, staticToolConfiguration.logToolName);
+        NativeExecutor nativeExecutor = new NativeExecutor(staticToolConfiguration.distributionService, distributionSpecifier,
+                                                           staticToolConfiguration.executableResolver, environment.execOperations,
+                                                           environment.archiveProcessor, environment.toolLogger,
+                                                           staticToolConfiguration.logToolName);
         PreparedCommandLine commandLine = createCommandLine(config);
         nativeExecutor.execute(commandLine);
     }

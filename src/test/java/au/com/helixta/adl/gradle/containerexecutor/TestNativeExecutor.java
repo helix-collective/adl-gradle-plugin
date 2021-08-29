@@ -7,6 +7,7 @@ import au.com.helixta.adl.gradle.generator.AdlToolLogger;
 import au.com.helixta.adl.gradle.generator.ArchiveProcessor;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.internal.file.IdentityFileResolver;
 import org.gradle.api.model.ObjectFactory;
@@ -50,6 +51,11 @@ class TestNativeExecutor
     @Mock
     private ExecResult execResult;
 
+    @Mock
+    private ArchiveOperations archiveOperations;
+
+    private ArchiveProcessor archiveProcessor;
+
     @TempDir
     Path tempDir;
 
@@ -70,6 +76,8 @@ class TestNativeExecutor
     private void setUp()
     throws IOException, DistributionNotFoundException
     {
+        archiveProcessor = new ArchiveProcessor(archiveOperations);
+
         invokedSpecs.clear();
 
         when(distributionService.resolveDistribution(any())).thenReturn(tempDir.toFile());
@@ -96,7 +104,7 @@ class TestNativeExecutor
     void singleStringArgument()
     throws ContainerExecutionException, IOException, DistributionNotFoundException
     {
-        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, adlLog, "LOG");
+        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, archiveProcessor, adlLog, "LOG");
 
         PreparedCommandLine c = new PreparedCommandLine().argument("-test");
         executor.execute(c);
@@ -109,7 +117,7 @@ class TestNativeExecutor
     void directoryArgument()
     throws ContainerExecutionException, IOException, DistributionNotFoundException
     {
-        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, adlLog, "LOG");
+        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, archiveProcessor, adlLog, "LOG");
 
         PreparedCommandLine c = new PreparedCommandLine().argument(tempDir.toFile(), "unusedLabel", PreparedCommandLine.FileTransferMode.INPUT, PreparedCommandLine.FileType.DIRECTORY);
         executor.execute(c);
@@ -126,7 +134,7 @@ class TestNativeExecutor
         Path argFile1 = Files.createFile(argDir.resolve("file1.txt"));
         Path argFile2 = Files.createFile(argDir.resolve("file2.txt"));
 
-        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, adlLog, "LOG");
+        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, archiveProcessor, adlLog, "LOG");
 
         FileTree tree = objectFactory.fileTree().from(argDir);
         PreparedCommandLine c = new PreparedCommandLine().argument(tree, "unusedLabel");
@@ -144,7 +152,7 @@ class TestNativeExecutor
         Files.createFile(argDir.resolve("file1.txt"));
         Files.createFile(argDir.resolve("file2.txt"));
 
-        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, adlLog, "LOG");
+        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, archiveProcessor, adlLog, "LOG");
 
         FileTree tree = objectFactory.fileTree().from(argDir);
         PreparedCommandLine c = new PreparedCommandLine().argument(tree, "unusedLabel", new PreparedCommandLine.SingleBaseDirectoryCommandLineGenerator());
@@ -166,7 +174,7 @@ class TestNativeExecutor
         Files.createDirectories(argDir2Sub);
         Path argFile3 = Files.createFile(argDir2Sub.resolve("file3.txt"));
 
-        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, adlLog, "LOG");
+        NativeExecutor executor = new NativeExecutor(distributionService, distributionSpecifier, new SimpleExecutableResolver("myprogram"), execOperations, archiveProcessor, adlLog, "LOG");
 
         FileTree tree = objectFactory.fileTree().from(argDir1).plus(objectFactory.fileTree().from(argDir2));
         PreparedCommandLine c = new PreparedCommandLine().argument(tree, "unusedLabel");
