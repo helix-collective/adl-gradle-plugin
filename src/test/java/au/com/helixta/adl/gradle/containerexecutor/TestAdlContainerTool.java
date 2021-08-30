@@ -151,7 +151,7 @@ class TestAdlContainerTool
         AdlContainerTool.AdlFullConfiguration config = new AdlContainerTool.AdlFullConfiguration(adl, generation, dockerConfig);
 
         //Run the tool - just use Docker because native installation is messier and won't work on all platforms
-        tool.execute(config, ContainerTool.ExecutionPlatform.DOCKER);
+        tool.execute(config, ExecutionPlatform.DOCKER);
 
         //Verify the results - check Java file was written has a bit of known content in it
         Path catJavaFile = adlOut.resolve("adl").resolve("sub").resolve("Cat.java");

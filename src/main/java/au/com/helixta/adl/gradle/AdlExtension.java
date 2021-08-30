@@ -1,8 +1,8 @@
 package au.com.helixta.adl.gradle;
 
-import au.com.helixta.adl.gradle.config.AdlPlatform;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
+import au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform;
 import org.gradle.api.Action;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileCollection;
@@ -14,7 +14,6 @@ import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
 
 import java.io.File;
-import java.util.Arrays;
 
 public interface AdlExtension
 {
@@ -69,9 +68,9 @@ public interface AdlExtension
 
     @Internal
     @Optional
-    public AdlPlatform getPlatform();
+    public ExecutionPlatform getPlatform();
 
-    public void setPlatform(AdlPlatform platform);
+    public void setPlatform(ExecutionPlatform platform);
 
     public default AdlExtension copyFrom(AdlExtension other)
     {

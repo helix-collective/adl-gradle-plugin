@@ -83,7 +83,7 @@ processTestResources {
 def adlPlatformProperty = System.getProperty("adl.platform")
 if (adlPlatformProperty) {
     tasks.withType(au.com.helixta.adl.gradle.AdlGenerateTask) {
-        platform = au.com.helixta.adl.gradle.config.AdlPlatform.valueOf(adlPlatformProperty)
+        platform = au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform.valueOf(adlPlatformProperty)
     }
 }
 

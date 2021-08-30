@@ -6,6 +6,7 @@ import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.containerexecutor.AdlContainerTool;
 import au.com.helixta.adl.gradle.containerexecutor.ContainerExecutionException;
 import au.com.helixta.adl.gradle.containerexecutor.ContainerTool;
+import au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform;
 import au.com.helixta.adl.gradle.distribution.DistributionNotFoundException;
 
 import java.io.IOException;
@@ -15,9 +16,9 @@ public class AdlToolGenerator implements AdlGenerator
 {
     private final AdlContainerTool adlTool;
     private final DockerConfiguration dockerConfiguration;
-    private final ContainerTool.ExecutionPlatform platform;
+    private final ExecutionPlatform platform;
 
-    public AdlToolGenerator(ContainerTool.Environment environment, DockerConfiguration dockerConfiguration, ContainerTool.ExecutionPlatform platform)
+    public AdlToolGenerator(ContainerTool.Environment environment, DockerConfiguration dockerConfiguration, ExecutionPlatform platform)
     {
         this.adlTool = new AdlContainerTool(environment);
         this.dockerConfiguration = Objects.requireNonNull(dockerConfiguration);
