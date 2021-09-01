@@ -9,6 +9,7 @@ import au.com.helixta.adl.gradle.config.TypescriptGenerationConfiguration;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
 
 import java.io.File;
+import java.util.function.UnaryOperator;
 
 public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConfiguration>
 {
@@ -22,7 +23,8 @@ public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConf
         AdlDistributionService distributionService = new AdlDistributionService(environment.getHomeDirProvider(), environment.getFileSystemOperations(),
                                                                                 environment.getArchiveOperations(), environment.getProject());
 
-        return new StaticToolConfiguration(distributionService, new SimpleExecutableResolver("bin/adlc"), "adlc", "/opt/adl", "/data", "adl/adlc", "adl-gradle");
+        return new StaticToolConfiguration(distributionService, new SimpleExecutableResolver("bin/adlc"), "adlc", "/opt/adl", "/data",
+                                           DockerImageDefinitionTransformer.NO_MODIFICATION, "adl/adlc", "adl-gradle", UnaryOperator.identity());
     }
 
     @Override

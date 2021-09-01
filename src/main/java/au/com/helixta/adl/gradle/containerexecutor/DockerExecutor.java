@@ -28,7 +28,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.io.IOUtils;
-import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
@@ -48,6 +47,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.UnaryOperator;
 
 public class DockerExecutor implements ContainerExecutor
 {
@@ -59,8 +59,10 @@ public class DockerExecutor implements ContainerExecutor
     private final DockerClient docker;
     private final DistributionService distributionService;
     private final ExecutableResolver executableResolver;
+    private final UnaryOperator<List<String>> commandLinePostProcessor;
     private final String dockerToolInstallBaseDirectory;
     private final String dockerMappedFileBaseDirectory;
+    private final DockerImageDefinitionTransformer dockerImageDefinitionTransformer;
     private final String distributionVersion;
     private final String baseDockerImageName;
     private final String baseDockerContainerName;
@@ -69,7 +71,6 @@ public class DockerExecutor implements ContainerExecutor
     private final String logToolName;
     private final TargetMachineFactory targetMachineFactory;
     private final ObjectFactory objectFactory;
-    private final ArchiveOperations archiveOperations;
     private final ArchiveProcessor archiveProcessor;
 
     /**
@@ -78,8 +79,10 @@ public class DockerExecutor implements ContainerExecutor
      * @param docker Docker client.
      * @param distributionService distribution service for downloading and resolving the tool distribution that will be installed into Docker images.
      * @param executableResolver used for resolving the executable of the tool in the distribution.
+     * @param commandLinePostProcessor transform / post process the command line specifically for Docker execution.
      * @param dockerToolInstallBaseDirectory base directory for installing the tool into the docker image.
      * @param dockerMappedFileBaseDirectory base directory in the Docker container for copying input/output files as part of the tool execution.
+     * @param dockerImageDefinitionTransformer modifies the Dockerfile used to build the base image from the default if needed.
      * @param distributionVersion version of the distribution to use.
      * @param baseDockerImageName the base Docker image name to generate, without the version.
      * @param baseDockerContainerName the prefix used to name Docker containers generated from the executor.
@@ -88,21 +91,23 @@ public class DockerExecutor implements ContainerExecutor
      * @param logToolName name of the tool to use when logging.
      * @param targetMachineFactory target machine factory.
      * @param objectFactory Gradle object factory.
-     * @param archiveOperations Gradle archive operations object.
      * @param archiveProcessor Gradle archive processor object.
      */
     public DockerExecutor(DockerClient docker, DistributionService distributionService, ExecutableResolver executableResolver,
-                          String dockerToolInstallBaseDirectory, String dockerMappedFileBaseDirectory, String distributionVersion,
-                          String baseDockerImageName, String baseDockerContainerName,
+                          UnaryOperator<List<String>> commandLinePostProcessor,
+                          String dockerToolInstallBaseDirectory, String dockerMappedFileBaseDirectory,
+                          DockerImageDefinitionTransformer dockerImageDefinitionTransformer,
+                          String distributionVersion, String baseDockerImageName, String baseDockerContainerName,
                           DockerConfiguration dockerConfiguration, AdlToolLogger adlLog, String logToolName,
-                          TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory, ArchiveOperations archiveOperations,
-                          ArchiveProcessor archiveProcessor)
+                          TargetMachineFactory targetMachineFactory, ObjectFactory objectFactory, ArchiveProcessor archiveProcessor)
     {
         this.docker = Objects.requireNonNull(docker);
         this.distributionService = Objects.requireNonNull(distributionService);
         this.executableResolver = Objects.requireNonNull(executableResolver);
+        this.commandLinePostProcessor = Objects.requireNonNull(commandLinePostProcessor);
         this.dockerToolInstallBaseDirectory = Objects.requireNonNull(dockerToolInstallBaseDirectory);
         this.dockerMappedFileBaseDirectory = Objects.requireNonNull(dockerMappedFileBaseDirectory);
+        this.dockerImageDefinitionTransformer = Objects.requireNonNull(dockerImageDefinitionTransformer);
         this.distributionVersion = Objects.requireNonNull(distributionVersion);
         this.baseDockerImageName = Objects.requireNonNull(baseDockerImageName);
         this.baseDockerContainerName = Objects.requireNonNull(baseDockerContainerName);
@@ -111,7 +116,6 @@ public class DockerExecutor implements ContainerExecutor
         this.logToolName = Objects.requireNonNull(logToolName);
         this.targetMachineFactory = Objects.requireNonNull(targetMachineFactory);
         this.objectFactory = Objects.requireNonNull(objectFactory);
-        this.archiveOperations = Objects.requireNonNull(archiveOperations);
         this.archiveProcessor = Objects.requireNonNull(archiveProcessor);
     }
 
@@ -144,6 +148,7 @@ public class DockerExecutor implements ContainerExecutor
         //Generate the command line string including mapped file names
         String toolExecutableFullPath = executableResolver.resolveExecutable(dockerToolInstallBaseDirectory, distributionSpecifierForDockerImage());
         List<String> toolCommand = dockerFileMapper.getMappedCommandLineWithProgram(toolExecutableFullPath);
+        toolCommand = commandLinePostProcessor.apply(toolCommand);
 
         //Generate the container from the Docker image
         String containerName = generateDockerContainerName();
@@ -318,13 +323,8 @@ public class DockerExecutor implements ContainerExecutor
             }
 
             //Dockerfile
-            String toolExecutable = executableResolver.resolveExecutable(dockerToolInstallBaseDirectory, specForDockerImage);
-            byte[] dockerFileBytes =
-                    ("FROM ubuntu:20.04\n" +
-                     "LABEL " + DOCKER_GENERATOR_LABEL + "=\"" + getAdlGradlePluginVersion() + "\"\n" +
-                     "COPY /tool/ " + dockerToolInstallBaseDirectory + "\n" +
-                     "CMD [\"" + toolExecutable + "\"]"
-                    ).getBytes(StandardCharsets.UTF_8);
+            String dockerFile = generateDockerfile(specForDockerImage);
+            byte[] dockerFileBytes = dockerFile.getBytes(StandardCharsets.UTF_8);
             TarArchiveEntry dockerfileEntry = new TarArchiveEntry("Dockerfile");
             dockerfileEntry.setSize(dockerFileBytes.length);
             tarOut.putArchiveEntry(dockerfileEntry);
@@ -352,6 +352,21 @@ public class DockerExecutor implements ContainerExecutor
             else
                 callback.awaitImageId(dockerConfiguration.getImageBuildTimeout().toMillis(), TimeUnit.MILLISECONDS);
         }
+    }
+
+    private String generateDockerfile(DistributionSpecifier specForDockerImage)
+    throws IOException
+    {
+        String toolExecutable = executableResolver.resolveExecutable(dockerToolInstallBaseDirectory, specForDockerImage);
+
+        DockerImageDefinition definition = new DockerImageDefinition("ubuntu:20.04");
+        definition.getLabels().put(DOCKER_GENERATOR_LABEL, getAdlGradlePluginVersion());
+        definition.getCommands().add("COPY /tool/ " + dockerToolInstallBaseDirectory);
+        definition.getCommands().add("CMD [\"" + toolExecutable + "\"]");
+
+        dockerImageDefinitionTransformer.transform(definition);
+
+        return definition.toDockerFile();
     }
 
     /**

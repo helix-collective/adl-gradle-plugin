@@ -19,7 +19,9 @@ import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform;
 import org.gradle.process.ExecOperations;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 public abstract class ContainerTool<C>
 {
@@ -61,11 +63,13 @@ public abstract class ContainerTool<C>
         try (DockerClient dockerClient = environment.dockerClientFactory.createDockerClient())
         {
             DockerExecutor dockerExecutor = new DockerExecutor(dockerClient, staticToolConfiguration.distributionService, staticToolConfiguration.executableResolver,
+                                                               staticToolConfiguration.dockerCommandLinePostProcessor,
                                                                staticToolConfiguration.dockerToolInstallBaseDirectory, staticToolConfiguration.dockerMappedBaseDirectory,
+                                                               staticToolConfiguration.dockerImageDefinitionTransformer,
                                                                readDistributionVersion(config), staticToolConfiguration.baseDockerImageName,
                                                                staticToolConfiguration.baseDockerContainerName, readDockerConfiguration(config), environment.toolLogger,
                                                                staticToolConfiguration.logToolName, environment.targetMachineFactory, environment.objectFactory,
-                                                               environment.archiveOperations, environment.archiveProcessor);
+                                                               environment.archiveProcessor);
             PreparedCommandLine commandLine = createCommandLine(config);
             dockerExecutor.execute(commandLine);
         }
@@ -208,19 +212,25 @@ public abstract class ContainerTool<C>
         private final String logToolName;
         private final String dockerToolInstallBaseDirectory;
         private final String dockerMappedBaseDirectory;
+        private final DockerImageDefinitionTransformer dockerImageDefinitionTransformer;
         private final String baseDockerImageName;
         private final String baseDockerContainerName;
+        private final UnaryOperator<List<String>> dockerCommandLinePostProcessor;
 
         public StaticToolConfiguration(DistributionService distributionService, ExecutableResolver executableResolver, String logToolName, String dockerToolInstallBaseDirectory,
-                                       String dockerMappedBaseDirectory, String baseDockerImageName, String baseDockerContainerName)
+                                       String dockerMappedBaseDirectory, DockerImageDefinitionTransformer dockerImageDefinitionTransformer,
+                                       String baseDockerImageName, String baseDockerContainerName,
+                                       UnaryOperator<List<String>> dockerCommandLinePostProcessor)
         {
             this.distributionService = Objects.requireNonNull(distributionService);
             this.executableResolver = Objects.requireNonNull(executableResolver);
             this.logToolName = Objects.requireNonNull(logToolName);
             this.dockerToolInstallBaseDirectory = Objects.requireNonNull(dockerToolInstallBaseDirectory);
             this.dockerMappedBaseDirectory = Objects.requireNonNull(dockerMappedBaseDirectory);
+            this.dockerImageDefinitionTransformer = Objects.requireNonNull(dockerImageDefinitionTransformer);
             this.baseDockerImageName = Objects.requireNonNull(baseDockerImageName);
             this.baseDockerContainerName = Objects.requireNonNull(baseDockerContainerName);
+            this.dockerCommandLinePostProcessor = Objects.requireNonNull(dockerCommandLinePostProcessor);
         }
     }
 }

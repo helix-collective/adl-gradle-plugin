@@ -2,7 +2,6 @@ package au.com.helixta.adl.gradle.containerexecutor;
 
 import au.com.helixta.adl.gradle.distribution.DistributionSpecifier;
 
-import java.io.File;
 import java.io.IOException;
 
 @FunctionalInterface
