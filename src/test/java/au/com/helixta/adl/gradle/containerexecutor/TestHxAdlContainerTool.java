@@ -9,6 +9,7 @@ import au.com.helixta.adl.gradle.generator.AdlToolLogger;
 import au.com.helixta.adl.gradle.generator.ArchiveProcessor;
 import au.com.helixta.adl.gradle.generator.SimpleAdlToolLogger;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
+import com.google.common.io.Resources;
 import org.gradle.api.Project;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileCollection;
@@ -27,6 +28,8 @@ import org.junit.jupiter.api.io.TempDir;
 import javax.inject.Inject;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,18 +104,33 @@ class TestHxAdlContainerTool
         //Filesystem setup
         Path adlOut = Files.createTempDirectory(project.getProjectDir().toPath(), "adlout");
         Path sources = Files.createTempDirectory(project.getProjectDir().toPath(), "adlsources");
+
+        //Set up search path
+        Path searchPath = Files.createTempDirectory(project.getProjectDir().toPath(), "adlsearch");
+        Path searchPathCommon = searchPath.resolve("common");
+        Files.createDirectories(searchPathCommon);
+        URL dbAdlResource = Resources.getResource(TestHxAdlContainerTool.class, "/db.adl");
+        Path dbAdlFile = searchPathCommon.resolve("db.adl");
+        try (InputStream is = dbAdlResource.openStream())
+        {
+            Files.copy(is, dbAdlFile);
+        }
         Path adlFile = Files.createFile(sources.resolve("cat.adl"));
         Files.write(adlFile,
                 ("module sub {\n" +
+                "import common.db.DbTable;\n" +
                 "struct Cat {\n" +
                 "    String name;\n" +
                 "    Int32 age;\n" +
                 "};\n" +
+                 "annotation Cat DbTable {\n" +
+                 "   \"withIdPrimaryKey\" : true\n" +
+                 "};\n" +
                 "};\n").getBytes(StandardCharsets.UTF_8)
         );
 
         //Tool setup
-        AdlToolLogger toolLog = new SimpleAdlToolLogger(gradleLogger);
+        AdlToolLogger toolLog = new ConsoleAdlToolLogger();
         ContainerTool.Environment env = new ContainerTool.Environment(execOperations, toolLog, dockerFactory, targetMachineFactory, objectFactory, archiveOperations, archiveProcessor, gradleUserHomeDirProvider, fileSystemOperations, project, gradleLogger);
         HxAdlContainerTool tool = new HxAdlContainerTool(env);
 
@@ -129,7 +147,7 @@ class TestHxAdlContainerTool
             public FileCollection getSearchDirectories()
             {
                 //Just empty, no search directories
-                return objectFactory.fileCollection();
+                return objectFactory.fileCollection().from(searchPath);
             }
 
             @Override
@@ -156,6 +174,6 @@ class TestHxAdlContainerTool
         //Verify the results - check Java file was written has a bit of known content in it
         Path createSqlFile = adlOut.resolve("create.sql");
         assertThat(createSqlFile).isRegularFile();
-        assertThat(new String(Files.readAllBytes(createSqlFile), StandardCharsets.UTF_8)).contains("public class Cat");
+        assertThat(new String(Files.readAllBytes(createSqlFile), StandardCharsets.UTF_8)).contains("create table cat");
     }
 }
