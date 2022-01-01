@@ -7,6 +7,7 @@ import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationsConfiguration;
 import au.com.helixta.adl.gradle.containerexecutor.ContainerTool;
 import au.com.helixta.adl.gradle.containerexecutor.DockerClientFactory;
+import au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform;
 import au.com.helixta.adl.gradle.generator.AdlGenerationException;
 import au.com.helixta.adl.gradle.generator.AdlGenerator;
 import au.com.helixta.adl.gradle.generator.AdlToolGenerator;
@@ -89,7 +90,11 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
 
         ContainerTool.Environment environment = new ContainerTool.Environment(getExecOperations(), adlLogger, dockerFactory, getTargetMachineFactory(), getObjectFactory(), getArchiveOperations(), new ArchiveProcessor(getArchiveOperations()), getGradleUserHomeDirProvider(), getFileSystemOperations(), getProject(), getLogger());
 
-        return new AdlToolGenerator(environment, docker, getPlatform());
+        ExecutionPlatform platform = getPlatform();
+        if (platform == null)
+            platform = ExecutionPlatform.AUTO;
+
+        return new AdlToolGenerator(environment, docker, platform);
     }
 
     @Override

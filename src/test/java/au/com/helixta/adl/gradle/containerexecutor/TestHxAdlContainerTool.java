@@ -7,14 +7,19 @@ import au.com.helixta.adl.gradle.config.SqlSchemaGenerationConfiguration;
 import au.com.helixta.adl.gradle.distribution.DistributionNotFoundException;
 import au.com.helixta.adl.gradle.generator.AdlToolLogger;
 import au.com.helixta.adl.gradle.generator.ArchiveProcessor;
-import au.com.helixta.adl.gradle.generator.SimpleAdlToolLogger;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
+import com.github.gradle.node.NodeExtension;
+import com.github.gradle.node.NodePlugin;
+import com.github.gradle.node.task.NodeSetupTask;
 import com.google.common.io.Resources;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.file.FileTree;
+import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.initialization.GradleUserHomeDirProvider;
@@ -22,6 +27,7 @@ import org.gradle.nativeplatform.TargetMachineFactory;
 import org.gradle.process.ExecOperations;
 import org.gradle.testfixtures.ProjectBuilder;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,6 +42,10 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.*;
 
+/**
+ * This is just for testing that we can spawn the Hx ADL container tool.  It is an in-progress test class to test
+ * various bits and pieces that need to work for Hx ADL.
+ */
 class TestHxAdlContainerTool
 {
     private static DockerClientFactory dockerFactory;
@@ -95,6 +105,50 @@ class TestHxAdlContainerTool
         }
     }
 
+    private File resolveNodeArchiveFile(String nodeArchiveDependency)
+    {
+        Dependency dependency = project.getDependencies().create(nodeArchiveDependency);
+        Configuration configuration = project.getConfigurations().detachedConfiguration(dependency);
+        configuration.setTransitive(false);
+        return (File)configuration.resolve().iterator().next();
+    }
+
+    //TODO just temporary
+    /**
+     * Just testing node resolution at this point.  Grabs a particular version of node and tries to set it up.
+     */
+    @Test
+    @Disabled
+    void testNode() throws ContainerExecutionException, IOException, DistributionNotFoundException
+    {
+        /*
+        //NodeExtension node = new NodeExtension(project);
+        NodeExtension node = NodeExtension.create(project);
+        node.getDownload().set(true);
+        node.getVersion().set("14.15.4");
+
+        VariantComputer c = new VariantComputer();
+        Provider<File> nodeArchiveDep = c.computeNodeArchiveDependency(node).map(this::resolveNodeArchiveFile);
+
+        NodeSetupTask nodeSetupTask = project.getTasks().create("adl_native_node_setup", NodeSetupTask.class);
+        nodeSetupTask.getNodeArchiveFile().set(nodeArchiveDep::get);
+        nodeSetupTask.exec(); //need to set up repos manually sigh
+        */
+
+        //This code invokes node task and downloads node
+        project.getPluginManager().apply(NodePlugin.class);
+        NodeExtension node = project.getExtensions().getByType(NodeExtension.class);
+        node.getDownload().set(true);
+        node.getVersion().set("14.15.4");
+        ((ProjectInternal) project).evaluate();
+
+        NodeSetupTask nodeSetupTask = (NodeSetupTask) project.getTasks().getByName(NodeSetupTask.NAME);
+        nodeSetupTask.exec();
+
+        //At this point node is downloaded/installed
+        System.out.println("Done!");
+    }
+
     /**
      * Verify that the ADL tool can be invoked on a very simple use case and can read and produce files.
      */
@@ -105,7 +159,7 @@ class TestHxAdlContainerTool
         Path adlOut = Files.createTempDirectory(project.getProjectDir().toPath(), "adlout");
         Path sources = Files.createTempDirectory(project.getProjectDir().toPath(), "adlsources");
 
-        //Set up search path
+        //Set up search path7
         Path searchPath = Files.createTempDirectory(project.getProjectDir().toPath(), "adlsearch");
         Path searchPathCommon = searchPath.resolve("common");
         Files.createDirectories(searchPathCommon);

@@ -4,18 +4,19 @@ buildscript {
    repositories {
        mavenLocal()
        mavenCentral()
+       gradlePluginPortal()
    }
 }
 
 plugins {
     `java-library`
     id("au.com.helixta.adl")
-    id("com.github.node-gradle.node") version("2.2.4")
+    id("com.github.node-gradle.node") version("3.1.0")
 }
 
 node {
-    version = "14.15.4"
-    download = true
+    version.set("14.15.4")
+    download.set(true)
 }
 
 val adlTypescript = tasks.register<AdlGenerateTask>("adlTypescript") {
@@ -32,10 +33,10 @@ val adlTypescript = tasks.register<AdlGenerateTask>("adlTypescript") {
     }
 }
 
-val tsTest = tasks.register<com.moowork.gradle.node.npm.NpmTask>("tstest") {
+val tsTest = tasks.register<com.github.gradle.node.npm.task.NpmTask>("tstest") {
     dependsOn(adlTypescript)
     dependsOn(tasks.npmInstall)
-    setArgs(listOf("test"));
+    args.set(listOf("test"))
 }
 
 tasks.register<Delete>("cleanfull") {
