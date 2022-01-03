@@ -58,4 +58,134 @@ ADL and has support for wiring everything up for Java builds automatically so
 ADL task dependencies do not need to be explicitly defined in the build script to make the 
 Java compiler pick up source code.
 
+# Configuration
+
+## Source Sets
+
+When using the Java plugin in your build, for every [source set](https://docs.gradle.org/current/userguide/java_plugin.html#source_sets) defined in the project 
+('main', 'test', etc.) an ADL source directory will be configured with the name 'adl'.  So 
+for standard Java projects you will get `src/main/adl` and `src/test/adl`.  By default, all ADL
+source set directories will be configured with an inclusion pattern of '**/*.adl'.  This can be 
+reconfigured if needed in your build file:
+
+```
+sourceSets {
+    main {
+        adl {
+            //Exclude any ADL files starting with 'x'
+            exclude("**/x*")
+        }
+    }
+}
+```
+
+Dependencies are handled similarly to how the Java plugin works - e.g. ADL files from the 'main' 
+source set are available from the 'test' source set.
+
+# Generations
+
+A generation generates source code in a target language from ADL source.
+
+Currently 3 types of generation can be used.  See the ADL documentation and use autocomplete
+to discover configuration options.
+
+## Java
+
+Generates [Java](https://github.com/timbod7/adl/blob/master/docs/backend-java.md) source code from ADL.
+
+```
+adl {
+    version = "0.14"
+    generations {
+        java {
+            javaPackage  = "myproject.adl"
+            isGenerateTransitive = true
+            isGenerateAdlRuntime = true
+            headerComment = "Generated from ADL Gradle Plugin"
+        }
+    }
+}
+
+```
+
+## Typescript
+
+Generates [Typescript](https://github.com/timbod7/adl/blob/master/docs/backend-typescript.md) code from ADL.
+
+```
+val adlTypescript = tasks.register<AdlGenerateTask>("adlTypescript") {
+    version = "0.14"
+    source(file("$projectDir/src/main/adl"))
+    isVerbose = true
+    generations {
+        typescript {
+            outputDirectory.set(file("$projectDir/generated"))
+            isGenerateTransitive = true
+            isGenerateAdlRuntime = true
+            isGenerateResolver = true
+        }
+    }
+}
+```
+
+In this example, because the Java plugin conventions are not used (it's a typescript project)
+the task is registered manually.
+
+## Javascript 
+
+Generates Javascript code from ADL.
+
+```
+adl {
+    version = "0.14"
+    generations {
+        javascript {
+        }
+    }
+}
+```
+
+In this example, we're assuming a Java/Javascript hybrid Gradle project.
+
+## Custom compiler arguments
+
+Most ADL compiler arguments are available in the ADL Gradle plugin's model, however there might be 
+newer versions of ADL that support new features that the model doesn't have yet.  For these cases,
+the `compilerArgs` option:
+
+```
+adl {
+    version = "0.14"
+    generations {
+        java {
+            javaPackage  = "myproject.adl"
+            compilerArgs.add("--parcelable")
+        }
+    }
+}
+```
+
+# Dependency Handling
+
+Search directories for importing additional ADL source files for processing in your project can be added
+through Gradle's dependency mechanism using `adlSearchDirectories` dependency configurations.  They can exist
+in a directory in the filesystem or as an archive such as a JAR - the plugin will extract them as needed
+for processing with the ADL compiler.
+
+For example:
+
+```
+dependencies {
+    adlSearchDirectories(files("$projectDir/libadl"))
+}
+```
+
+will add all ADL files in the 'libadl' directory as search directories in the ADL compiler.
+
+It is also possible to use standard artifacts in a repository when they contain ADL files in 
+TAR or ZIP (or zip-derivative such as JAR) files.  Refer to these like normal Gradle dependencies.
+
+`adlSearchDirectories` configurations are available for each source set in the project.  For
+'main', use `adlSearchDirectories`, for 'test', use `testAdlSearchDirectories` and in the generic
+case use `<sourcesetname>AdlSearchDirectories`.
 
