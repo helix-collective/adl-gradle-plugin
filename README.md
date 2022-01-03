@@ -82,6 +82,40 @@ sourceSets {
 Dependencies are handled similarly to how the Java plugin works - e.g. ADL files from the 'main' 
 source set are available from the 'test' source set.
 
+## Platform
+
+The platform controls whether the ADL tool is executed natively on the OS or in a Docker container.
+By default (auto), native execution will be used on platforms that ADL has native binaries for,
+and Docker everywhere else.  This can be configured and customized with the `platform` option:
+
+```
+adl {
+    ...
+    platform = au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform.DOCKER
+}
+```
+
+This will force the use of Docker everywhere.
+
+Docker can be further configured in the build file itself or through environment variables.
+See the [Docker-java documentation](https://github.com/docker-java/docker-java/blob/master/docs/getting_started.md)
+for how this configuration is picked up through environment variables and other configuration if
+not explicitly configured in the build file.
+
+Explicit build configuration takes precedence, however:
+
+```
+adl {
+    ...
+    //Force using Docker on a a specific host for this build
+    platform = au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform.DOCKER
+    docker {
+        host = uri("tcp://192.168.99.100:2376")        
+    }
+}
+
+```
+
 # Generations
 
 A generation generates source code in a target language from ADL source.
