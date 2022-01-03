@@ -110,7 +110,9 @@ adl {
     //Force using Docker on a a specific host for this build
     platform = au.com.helixta.adl.gradle.containerexecutor.ExecutionPlatform.DOCKER
     docker {
-        host = uri("tcp://192.168.99.100:2376")        
+        host = uri("tcp://192.168.99.100:2376")
+        imageBuildTimeout = `java.time`.Duration.ofMinutes(10)
+        imagePullTimeout = `java.time`.Duration.ofMinutes(10)
     }
 }
 
