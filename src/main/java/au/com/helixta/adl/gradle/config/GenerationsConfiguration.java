@@ -9,6 +9,9 @@ import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Holds multiple code generation configurations.
+ */
 @AdlDslMarker
 public abstract class GenerationsConfiguration implements ExtensionAware
 {

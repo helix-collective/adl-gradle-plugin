@@ -29,29 +29,45 @@ public abstract class GenerationConfiguration
     @Inject
     protected abstract ObjectFactory getObjectFactory();
 
+    /**
+     * @return the directory where generated code is written.
+     */
     @OutputDirectory
     public DirectoryProperty getOutputDirectory()
     {
         return outputDirectory;
     }
 
+    /**
+     * Sets the directory where generated code is written.
+     */
     public void setOutputDirectory(File outputDirectory)
     {
         this.outputDirectory.fileValue(outputDirectory);
     }
 
+    /**
+     * @return a list of extra arguments passed directly to the ADL compiler tool.  Can be used to pass arguments not directly
+     * supported by the ADL plugin.
+     */
     @Input
     public List<String> getCompilerArgs()
     {
         return compilerArgs;
     }
 
+    /**
+     * Sets extra arguments that are passed directly to the ADL compiler tool.
+     */
     public void setCompilerArgs(List<String> compilerArgs)
     {
         this.compilerArgs.clear();
         this.compilerArgs.addAll(compilerArgs);
     }
 
+    /**
+     * @return the name of the generation type that reflects the type of source code generated.  Read-only.
+     */
     public String generationType()
     {
         return generationType;
