@@ -4,7 +4,7 @@ plugins {
     id("com.gradle.plugin-publish") version "0.19.0"
 }
 
-group = "au.com.helixta.adl.gradle"
+group = "au.net.causal.adl.gradle"
 version = "0.0.1"
 
 repositories {
@@ -15,7 +15,7 @@ repositories {
 gradlePlugin {
     plugins {
         create("adlPlugin") {
-            id = "au.com.helixta.adl"
+            id = "au.net.causal.adl"
             implementationClass = "au.com.helixta.adl.gradle.AdlGradlePlugin"
             displayName = "ADL Gradle Plugin"
             description = "Generate code from ADL (Algebraic Data Language) definitions."

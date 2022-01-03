@@ -24,7 +24,7 @@ Add the Gradle plugin to your project, for example (Kotlin build script):
 ```
 plugins {
     ...
-    id("au.com.helixta.adl") version("0.0.1")
+    id("au.net.causal.adl") version("0.0.1")
 }
 ```
 
