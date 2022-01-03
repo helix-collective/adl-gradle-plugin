@@ -70,9 +70,9 @@ public abstract class AdlGenerateTask extends SourceTask implements AdlConfigura
         {
             for (GenerationConfiguration gen : getGenerations().allGenerations())
             {
-                getLogger().warn("Generate: " + gen.getOutputDirectory().get());
-                getLogger().warn("   Files: " + this.getSource().getFiles());
-                getLogger().warn("   Search dirs: " + this.getSearchDirectories().getFiles());
+                getLogger().debug("Generate: " + gen.getOutputDirectory().get());
+                getLogger().debug("   Files: " + this.getSource().getFiles());
+                getLogger().debug("   Search dirs: " + this.getSearchDirectories().getFiles());
             }
 
             generator.generate(this, getGenerations().allGenerations());
