@@ -1,6 +1,7 @@
 plugins {
     `java-gradle-plugin`
     `maven-publish`
+    id("com.gradle.plugin-publish") version "0.19.0"
 }
 
 group = "au.com.helixta.adl.gradle"
@@ -16,8 +17,17 @@ gradlePlugin {
         create("adlPlugin") {
             id = "au.com.helixta.adl"
             implementationClass = "au.com.helixta.adl.gradle.AdlGradlePlugin"
+            displayName = "ADL Gradle Plugin"
+            description = "Generate code from ADL (Algebraic Data Language) definitions."
         }
     }
+}
+
+pluginBundle {
+    website = "https://bitbucket.org/prunge/adl-gradle-plugin"
+    vcsUrl = "https://bitbucket.org/prunge/adl-gradle-plugin"
+    tags = listOf("generate", "code-generation", "adl")
+    description = "Generate code from ADL (Algebraic Data Language) definitions."
 }
 
 java {
@@ -122,3 +132,13 @@ tasks {
         }
     }
 }
+
+//For testing plugin publishing
+//publishing {
+//    repositories {
+//        maven {
+//            name = "localPluginRepository"
+//            url = uri("../local-plugin-repository")
+//        }
+//    }
+//}
