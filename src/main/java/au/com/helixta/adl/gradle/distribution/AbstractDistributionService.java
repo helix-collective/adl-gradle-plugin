@@ -84,14 +84,15 @@ public abstract class AbstractDistributionService implements DistributionService
 
     protected static String osFamilyName(OperatingSystem os)
     {
+        // can't use gradle's family name `macos` as git release binaries are `osx`
+        if (os.isMacOsX())
+            return "osx";
         if (os instanceof OperatingSystemInternal)
             return ((OperatingSystemInternal)os).toFamilyName();
         else if (os.isWindows())
             return OperatingSystemFamily.WINDOWS;
         else if (os.isLinux())
             return OperatingSystemFamily.LINUX;
-        else if (os.isMacOsX())
-            return OperatingSystemFamily.MACOS;
         else
             return os.getName();
     }
