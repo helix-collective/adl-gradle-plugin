@@ -4,8 +4,8 @@ plugins {
     id("com.gradle.plugin-publish") version "0.19.0"
 }
 
-group = "au.net.causal.adl.gradle"
-version = "0.1.1"
+group = "au.com.helixta.adl.gradle"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -15,7 +15,7 @@ repositories {
 gradlePlugin {
     plugins {
         create("adlPlugin") {
-            id = "au.net.causal.adl"
+            id = "au.com.helixta.adl"
             implementationClass = "au.com.helixta.adl.gradle.AdlGradlePlugin"
             displayName = "ADL Gradle Plugin"
             description = "Generate code from ADL (Algebraic Data Language) definitions."

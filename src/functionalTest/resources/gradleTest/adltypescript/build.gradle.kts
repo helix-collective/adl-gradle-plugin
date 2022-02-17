@@ -10,7 +10,7 @@ buildscript {
 
 plugins {
     `java-library`
-    id("au.net.causal.adl")
+    id("au.com.helixta.adl")
     id("com.github.node-gradle.node") version("3.1.0")
 }
 

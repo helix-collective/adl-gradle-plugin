@@ -9,7 +9,7 @@ buildscript {
 
 plugins {
     `java-library`
-    id("au.net.causal.adl")
+    id("au.com.helixta.adl")
 }
 
 repositories {

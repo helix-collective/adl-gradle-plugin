@@ -141,7 +141,7 @@ class TestNativeExecutor
         executor.execute(c);
 
         assertThat(invokedExecSpec().getExecutable()).endsWith("myprogram");
-        assertThat(invokedExecSpec().getArgs()).containsExactly(argFile1.toAbsolutePath().toString(), argFile2.toAbsolutePath().toString());
+        assertThat(invokedExecSpec().getArgs()).containsExactlyInAnyOrder(argFile1.toAbsolutePath().toString(), argFile2.toAbsolutePath().toString());
     }
 
     @Test
@@ -181,7 +181,7 @@ class TestNativeExecutor
         executor.execute(c);
 
         assertThat(invokedExecSpec().getExecutable()).endsWith("myprogram");
-        assertThat(invokedExecSpec().getArgs()).containsExactly(argFile1.toAbsolutePath().toString(), argFile2.toAbsolutePath().toString(), argFile3.toAbsolutePath().toString());
+        assertThat(invokedExecSpec().getArgs()).containsExactlyInAnyOrder(argFile1.toAbsolutePath().toString(), argFile2.toAbsolutePath().toString(), argFile3.toAbsolutePath().toString());
     }
 
     //TODO archive processing
