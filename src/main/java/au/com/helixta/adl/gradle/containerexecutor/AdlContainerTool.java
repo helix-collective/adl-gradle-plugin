@@ -4,6 +4,7 @@ import au.com.helixta.adl.gradle.config.AdlConfiguration;
 import au.com.helixta.adl.gradle.config.DockerConfiguration;
 import au.com.helixta.adl.gradle.config.GenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavaGenerationConfiguration;
+import au.com.helixta.adl.gradle.config.JavaTablesGenerationConfiguration;
 import au.com.helixta.adl.gradle.config.JavascriptGenerationConfiguration;
 import au.com.helixta.adl.gradle.config.TypescriptGenerationConfiguration;
 import au.com.helixta.adl.gradle.distribution.AdlDistributionService;
@@ -51,6 +52,8 @@ public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConf
     {
         if (generation instanceof JavaGenerationConfiguration)
             adlcJavaCommand(adlConfiguration, (JavaGenerationConfiguration)generation, commandLine);
+        else if (generation instanceof JavaTablesGenerationConfiguration)
+            adlcJavaTablesCommand(adlConfiguration, (JavaTablesGenerationConfiguration)generation, commandLine);
         else if (generation instanceof TypescriptGenerationConfiguration)
             adlcTypescriptCommand(adlConfiguration, (TypescriptGenerationConfiguration)generation, commandLine);
         else if (generation instanceof JavascriptGenerationConfiguration)
@@ -99,6 +102,44 @@ public class AdlContainerTool extends ContainerTool<AdlContainerTool.AdlFullConf
             commandLine.argument("--suppress-warnings-annotation=" + generation.getSuppressWarningsAnnotation());
         if (generation.getHeaderComment() != null && !generation.getHeaderComment().isEmpty())
             commandLine.argument("--header-comment=" + generation.getHeaderComment());
+
+        if (generation.getManifest().isPresent())
+            commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT, containerPath -> "--manifest=" + containerPath);
+
+        generation.getCompilerArgs().forEach(commandLine::argument);
+
+        commandLine.argument(adlConfiguration.getSource(), "sources");
+    }
+
+    /**
+     * Generate the adlc command line arguments to generate Java Helix SQL tables files for the specified generation configuration.
+     *
+     * @param adlConfiguration the top-level ADL configuration.
+     * @param generation the generation configuration to generate files for.
+     * @param commandLine the command line to add arguments to.
+     */
+    private void adlcJavaTablesCommand(AdlConfiguration adlConfiguration, JavaTablesGenerationConfiguration generation, PreparedCommandLine commandLine)
+    {
+        commandLine.argument("java-tables");
+        commandLine.argument(generation.getOutputDirectory().get(), "adloutput", PreparedCommandLine.FileTransferMode.OUTPUT, containerPath -> "--outputdir=" + containerPath);
+
+        String searchDirBaseName = "adlsearchdir";
+        int searchDirCounter = 1;
+        for (File searchDir : adlConfiguration.getSearchDirectories())
+        {
+            String searchDirLabel = searchDirBaseName + searchDirCounter;
+            commandLine.argument(searchDir, searchDirLabel, PreparedCommandLine.FileTransferMode.INPUT, PreparedCommandLine.FileType.DIRECTORY, containerPath -> "--searchdir=" + containerPath);
+            searchDirCounter++;
+        }
+
+        if (generation.getJavaPackage() != null && !generation.getJavaPackage().trim().isEmpty())
+            commandLine.argument("--package=" + generation.getJavaPackage());
+
+        if (adlConfiguration.isVerbose())
+            commandLine.argument("--verbose");
+
+        if (generation.getAdlRuntimePackage() != null && !generation.getAdlRuntimePackage().isEmpty())
+            commandLine.argument("--rtpackage=" + generation.getAdlRuntimePackage());
 
         if (generation.getManifest().isPresent())
             commandLine.argument(generation.getManifest().get(), "manifest", PreparedCommandLine.FileTransferMode.OUTPUT, containerPath -> "--manifest=" + containerPath);
