@@ -115,7 +115,7 @@ public class AdlGradlePlugin implements Plugin<Project>
             //Make the Java compile task depend on this if it has Java generators
             project.getTasks().named(sourceSet.getCompileJavaTaskName(), compileJavaTask ->
             {
-                if (extension.getGenerations() != null && !extension.getGenerations().getJava().isEmpty())
+                if (extension.getGenerations() != null && (!extension.getGenerations().getJava().isEmpty() || !extension.getGenerations().getJavaTables().isEmpty()))
                     compileJavaTask.dependsOn(taskName);
             });
         });

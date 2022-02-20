@@ -38,14 +38,8 @@ public abstract class AbstractDistributionService implements DistributionService
      */
     private final String distributionSimpleName;
 
-    /**
-     * Group ID used for distribution artifacts in the local repo.
-     */
-    private final String distributionGroupId;
-
     protected AbstractDistributionService(URI distributionBaseUrl,
                                           String distributionSimpleName,
-                                          String distributionGroupId,
                                           GradleUserHomeDirProvider homeDirProvider,
                                           FileSystemOperations fileSystemOperations,
                                           ArchiveOperations archiveOperations,
@@ -53,7 +47,6 @@ public abstract class AbstractDistributionService implements DistributionService
     {
         this.distributionBaseUrl = Objects.requireNonNull(distributionBaseUrl);
         this.distributionSimpleName = Objects.requireNonNull(distributionSimpleName);
-        this.distributionGroupId = Objects.requireNonNull(distributionGroupId);
         this.unpackedDistributionInstallationDirectory = new File(homeDirProvider.getGradleUserHomeDirectory(), distributionSimpleName);
         this.fileSystemOperations = fileSystemOperations;
         this.archiveOperations = archiveOperations;
@@ -97,6 +90,35 @@ public abstract class AbstractDistributionService implements DistributionService
             return os.getName();
     }
 
+    /**
+     * Given a specifier, returns the base download URL.  By default, just returns the distribution base URL
+     * passed into the constructor, but subclasses may override for special cases.
+     *
+     * @param spec distribution specifier.
+     *
+     * @return the distribution base URL for a specifier.
+     */
+    protected URI resolveDistributionBaseUrl(DistributionSpecifier spec)
+    {
+        return distributionBaseUrl;
+    }
+
+    /**
+     * Creates a dependency to download from the distribution URL (treated as a repository).
+     * By default, will craft a name suitable for typical GitHub releases, but may be customized by subclasses
+     * for any special logic.
+     *
+     * @param downloadParameters download parameters.
+     * @param spec distribution specifier with version, architecture and OS.
+     *
+     * @return the created dependency.
+     */
+    protected Dependency createDownloadDependency(DownloadParameters downloadParameters, DistributionSpecifier spec)
+    {
+        return project.getDependencies().create(
+                downloadParameters.getGroupId() + ":" + downloadParameters.getArtifactId() + ":" + spec.getVersion() + ":" + downloadParameters.getClassifier() + "@" + downloadParameters.getExtension());
+    }
+
     @Override
     public File resolveDistributionArchive(DistributionSpecifier spec)
     throws DistributionNotFoundException
@@ -110,19 +132,19 @@ public abstract class AbstractDistributionService implements DistributionService
         //This repo only supports our specific dependency
         project.getRepositories().ivy(r -> {
             r.setName(distributionSimpleName + "-distribution");
-            r.setUrl(distributionBaseUrl);
+            r.setUrl(resolveDistributionBaseUrl(spec));
             r.patternLayout(p -> {
                 p.artifact("v[revision]/[artifact]-[revision]-[classifier].[ext]");
             });
             r.metadataSources(IvyArtifactRepository.MetadataSources::artifact); //No metadata files in Github
             r.content(c -> {
-                c.includeGroup(distributionGroupId);
+                c.includeGroup(downloadParameters.getGroupId());
             });
         });
 
         //Then use Gradle's dependency system to download it
         //If it's already downloaded it will be cached locally and just give a reference to the file without additional download
-        Dependency distributionArchiveDependency = project.getDependencies().create(distributionGroupId + ":" + downloadParameters.getArtifactId() + ":" + spec.getVersion() + ":" + downloadParameters.getClassifier() + "@" + downloadParameters.getExtension());
+        Dependency distributionArchiveDependency = createDownloadDependency(downloadParameters, spec);
         Configuration distributionArchiveDependencyConfig = project.getConfigurations().detachedConfiguration(distributionArchiveDependency);
         distributionArchiveDependencyConfig.setTransitive(false);
 
@@ -194,15 +216,25 @@ public abstract class AbstractDistributionService implements DistributionService
 
     protected static class DownloadParameters
     {
+        private final String groupId;
         private final String artifactId;
         private final String classifier;
         private final String extension;
 
-        public DownloadParameters(String artifactId, String classifier, String extension)
+        public DownloadParameters(String groupId, String artifactId, String classifier, String extension)
         {
+            this.groupId = Objects.requireNonNull(groupId);
             this.artifactId = Objects.requireNonNull(artifactId);
             this.classifier = Objects.requireNonNull(classifier);
             this.extension = Objects.requireNonNull(extension);
+        }
+
+        /**
+         * @return the group ID string used to build the distribution download URL.
+         */
+        public String getGroupId()
+        {
+            return groupId;
         }
 
         /**

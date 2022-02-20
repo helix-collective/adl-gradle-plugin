@@ -18,6 +18,7 @@ public abstract class GenerationsConfiguration implements ExtensionAware
     private final List<JavaGenerationConfiguration> java = new ArrayList<>();
     private final List<TypescriptGenerationConfiguration> typescript = new ArrayList<>();
     private final List<JavascriptGenerationConfiguration> javascript = new ArrayList<>();
+    private final List<JavaTablesGenerationConfiguration> javaTables = new ArrayList<>();
 
     @Inject
     protected abstract ObjectFactory getObjectFactory();
@@ -40,12 +41,19 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         return javascript;
     }
 
+    @Nested
+    public List<JavaTablesGenerationConfiguration> getJavaTables()
+    {
+        return javaTables;
+    }
+
     public List<? extends GenerationConfiguration> allGenerations()
     {
         List<GenerationConfiguration> all = new ArrayList<>(java.size() + typescript.size());
         all.addAll(getJava());
         all.addAll(getTypescript());
         all.addAll(getJavascript());
+        all.addAll(getJavaTables());
         return all;
     }
 
@@ -70,6 +78,13 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         javascript.add(t);
     }
 
+    public void javaTables(Action<? super JavaTablesGenerationConfiguration> configuration)
+    {
+        JavaTablesGenerationConfiguration t = getObjectFactory().newInstance(JavaTablesGenerationConfiguration.class);
+        configuration.execute(t);
+        javaTables.add(t);
+    }
+
     public GenerationsConfiguration copyFrom(GenerationsConfiguration other)
     {
         for (JavaGenerationConfiguration otherConfig : other.getJava())
@@ -83,6 +98,10 @@ public abstract class GenerationsConfiguration implements ExtensionAware
         for (JavascriptGenerationConfiguration otherConfig : other.getJavascript())
         {
             this.javascript(thisConfig -> thisConfig.copyFrom(otherConfig));
+        }
+        for (JavaTablesGenerationConfiguration otherConfig : other.getJavaTables())
+        {
+            this.javaTables(thisConfig -> thisConfig.copyFrom(otherConfig));
         }
         return this;
     }

@@ -14,7 +14,7 @@ public class HxAdlDistributionService extends AbstractDistributionService
                                     FileSystemOperations fileSystemOperations,
                                     ArchiveOperations archiveOperations, Project project)
     {
-        super(URI.create("https://github.com/helix-collective/helix-adl-tools/releases/download/"), "hxadl", "au.com.helix.adl.tools", homeDirProvider, fileSystemOperations,
+        super(URI.create("https://github.com/helix-collective/helix-adl-tools/releases/download/"), "hxadl", homeDirProvider, fileSystemOperations,
               archiveOperations, project);
     }
 
@@ -24,7 +24,7 @@ public class HxAdlDistributionService extends AbstractDistributionService
         String classifier = specToClassifier(specifier);
         if (classifier == null)
             return null;
-        return new DownloadParameters("hxadl-bindist", classifier, "zip");
+        return new DownloadParameters("au.com.helix.adl.tools", "hxadl-bindist", classifier, "zip");
     }
 
     /**
